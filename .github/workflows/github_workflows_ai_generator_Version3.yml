@@ -64,3 +64,9 @@ jobs:
             - Generated files live under `output/`
             - Please review before merging.
           labels: automated
+
+      - name: 🔄 Auto-merge Pull Request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          gh pr merge auto/generate-assets --merge --auto
