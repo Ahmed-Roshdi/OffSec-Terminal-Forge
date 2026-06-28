@@ -51,10 +51,11 @@ jobs:
           ls -la output/maps/ || echo "Maps directory not found!"
           ls -la output/dialogues/ || echo "Dialogues directory not found!"
 
-      - name: 📤 Create Pull Request
+          - name: 📤 Create Pull Request
+        id: cpr
         uses: peter-evans/create-pull-request@v5
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GH_PAT }}
           commit-message: "🤖 chore: auto-generated AI dialogue & map"
           branch: auto/generate-assets
           delete-branch: true
@@ -62,11 +63,13 @@ jobs:
           body: |
             This PR adds auto-generated assets created by the AI generator workflow.
             - Generated files live under `output/`
-            - Please review before merging.
+            - Auto-merged via GitHub CLI.
           labels: automated
 
       - name: 🔄 Auto-merge Pull Request
+        if: steps.cpr.outputs.pull-request-number != ''
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          gh pr merge auto/generate-assets --merge --auto
+          echo "[*] Attempting to auto-merge PR #${{ steps.cpr.outputs.pull-request-number }}"
+          gh pr merge ${{ steps.cpr.outputs.pull-request-number }} --merge --delete-branch
