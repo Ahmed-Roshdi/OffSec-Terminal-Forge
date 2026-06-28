@@ -1,10 +1,8 @@
 name: 🧠 AI Dialogue Generator (Auto PR)
 
-# Manual trigger for now; keep workflow_dispatch so you control execution.
 on:
   workflow_dispatch:
 
-# Allow this workflow to create branches & PRs
 permissions:
   contents: write
   pull-requests: write
@@ -39,11 +37,12 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
-          set -e
+          set -euo pipefail
           python engines/alien_generator.py
+          # dialogue generator may fail against API; allow fallback handling within script
           python engines/dialogue_generator.py || echo "dialogue generator failed, using fallback"
 
-      - name: Configure git user (for commits)
+      - name: Configure git user for CI commits
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -65,12 +64,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -e
+          set -euo pipefail
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
           BRANCH="auto/generate-${{ github.run_number }}-${{ github.run_id }}"
-          git checkout -b "$BRANCH"
+
+          # create branch from default branch to ensure consistent base
+          git fetch origin "$DEFAULT_BRANCH" --depth=1
+          git checkout -b "$BRANCH" "origin/$DEFAULT_BRANCH"
+
+          # add only the output directory
           git add output/ || true
-          git commit -m "chore: auto-generated AI dialogue & map [skip ci]" || { echo "nothing to commit"; exit 0; }
-          git push --set-upstream origin "$BRANCH"
+          if git diff --cached --quiet; then
+            echo "No staged changes to commit"; exit 0
+          fi
+
+          git commit -m "chore: auto-generated AI dialogue & map [skip ci]"
+
+          # push branch; retry once on transient error
+          git push --set-upstream origin "$BRANCH" || (sleep 2 && git push --set-upstream origin "$BRANCH")
+
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
       - name: Create Pull Request
@@ -79,9 +91,11 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: ${{ steps.create_branch.outputs.branch }}
+          base: ${{ github.event.repository.default_branch }}
           title: "Automated: Add generated AI assets"
           body: |
-            This PR adds auto-generated assets created by the scheduled/manual AI generator workflow.
+            This PR adds auto-generated assets created by the AI generator workflow.
+
             - Generated files live under `output/`
             - Please review before merging.
           labels: automated
