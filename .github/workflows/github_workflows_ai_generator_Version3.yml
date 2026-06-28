@@ -15,7 +15,7 @@ jobs:
   generate-and-open-pr:
     name: 🚀 Generate Cyberpunk Assets and Open PR
     runs-on: ubuntu-latest
-    environment: Dialogue_Generator-AI  # <-- ربط البيئة التي تحتوي على الأسرار
+    environment: Dialogue_Generator-AI
     timeout-minutes: 30
 
     steps:
@@ -34,51 +34,96 @@ jobs:
           python -m pip install --upgrade pip
           pip install Pillow
 
-      - name: ✅ Check required secrets
+      # ── Secrets are mapped into env vars and checked via the env context ──
+      # ── Never interpolate secrets directly into shell strings             ──
+      - name: ✅ Verify required secrets are present
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
-          if [ -z "${{ secrets.GROQ_API_KEY }}" ]; then
-            echo "[!] ERROR: GROQ_API_KEY is missing from the environment."
-            exit 1
+          MISSING=0
+          if [ -z "$GROQ_API_KEY" ]; then
+            echo "[!] ERROR: GROQ_API_KEY is missing from the Dialogue_Generator-AI environment."
+            MISSING=1
           fi
-          if [ -z "${{ secrets.GH_PAT }}" ]; then
-            echo "[!] ERROR: GH_PAT is missing from the environment."
+          if [ -z "$GH_PAT" ]; then
+            echo "[!] ERROR: GH_PAT is missing from the Dialogue_Generator-AI environment."
+            MISSING=1
+          fi
+          if [ "$MISSING" -eq 1 ]; then
+            echo "[!] One or more required secrets are absent. Aborting."
             exit 1
           fi
           echo "[+] All secrets loaded successfully from Dialogue_Generator-AI environment."
 
-      - name: 🌌 Generate assets (map + dialogue)
+      - name: 🌍 Generate alien map
+        run: python engines/alien_generator.py
+
+      - name: 💬 Generate AI dialogue
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
-          python engines/alien_generator.py
-          
-          echo "[*] Waiting 2 seconds before starting dialogue generator..."
-          sleep 2
-          
-          python engines/dialogue_generator.py || echo "dialogue generator failed, using fallback"
+          echo "[*] Starting dialogue generator..."
+          python engines/dialogue_generator.py
+          EXIT_CODE=$?
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "[!] dialogue_generator.py exited with code $EXIT_CODE"
+            echo "[*] Fallback mode: proceeding with static dialogue output if present."
+          fi
+
+      # ── Guard: only continue if output files were actually produced ──
+      - name: 🔍 Verify output files exist
+        run: |
+          if [ -z "$(ls -A output/ 2>/dev/null)" ]; then
+            echo "[!] ERROR: output/ directory is empty or missing. Nothing to commit."
+            exit 1
+          fi
+          echo "[+] Output files found:"
+          ls -lh output/
 
       - name: 📤 Create Pull Request
         id: cpr
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GH_PAT }}
           commit-message: "🤖 chore: auto-generated AI dialogue & map"
           branch: auto/generate-assets
           delete-branch: true
-          title: "Automated: Add generated AI assets"
+          title: "🤖 Automated: Add generated AI assets"
           body: |
             This PR adds auto-generated assets created by the AI generator workflow.
             - Generated files live under `output/`
-            - Auto-merged via GitHub CLI.
+            - Triggered manually via `workflow_dispatch`
+            - Auto-merged via GitHub CLI after creation.
           labels: automated
           draft: false
+
+      # ── Guard: skip merge entirely if no PR was created (no file changes) ──
+      - name: ⏭️ Skip if no PR was created
+        if: steps.cpr.outputs.pull-request-number == ''
+        run: echo "[*] No changes detected — no PR was created. Skipping merge step."
 
       - name: 🔄 Auto-merge Pull Request
         if: steps.cpr.outputs.pull-request-number != ''
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          echo "[*] Waiting 5 seconds for GitHub API to process PR mergeability..."
-          sleep 5
-          echo "[*] Attempting to auto-merge PR #${{ steps.cpr.outputs.pull-request-number }} with Admin privileges"
-          gh pr merge ${{ steps.cpr.outputs.pull-request-number }} --merge --admin --delete-branch
+          PR_NUMBER="${{ steps.cpr.outputs.pull-request-number }}"
+          echo "[*] PR #$PR_NUMBER created. Waiting for GitHub mergeability check..."
+
+          # Retry loop: attempt merge up to 5 times with increasing delay
+          MAX_ATTEMPTS=5
+          ATTEMPT=1
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            echo "[*] Merge attempt $ATTEMPT/$MAX_ATTEMPTS for PR #$PR_NUMBER..."
+            if gh pr merge "$PR_NUMBER" --merge --admin --delete-branch; then
+              echo "[+] PR #$PR_NUMBER merged successfully."
+              exit 0
+            fi
+            echo "[!] Merge attempt $ATTEMPT failed. Retrying in $((ATTEMPT * 5))s..."
+            sleep $((ATTEMPT * 5))
+            ATTEMPT=$((ATTEMPT + 1))
+          done
+
+          echo "[!] ERROR: All $MAX_ATTEMPTS merge attempts failed for PR #$PR_NUMBER."
+          exit 1
