@@ -24,9 +24,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GH_PAT }}   # PAT so push + merge can bypass branch rules
+          token: ${{ secrets.GH_PAT }}
 
-      # ── 2. Python ─────────────────────────────────────────────────────────
+      # ── 2. Python ───────────────────────────────────────────────────────────
       - name: 🐍 Setup Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -38,7 +38,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install Pillow
 
-      # ── 4. Secrets check (safe — never interpolates secrets into shell) ───
+      # ── 4. Secrets check ───────────────────────────────────────────────────
       - name: ✅ Verify secrets are present
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -50,7 +50,7 @@ jobs:
           [ "$MISSING" -eq 1 ] && exit 1
           echo "[+] All secrets loaded from Dialogue_Generator-AI."
 
-      # ── 5. Generate assets ─────────────────────────────────────────────────
+      # ── 5. Generate ────────────────────────────────────────────────────────
       - name: 🌍 Generate alien map
         run: python engines/alien_generator.py
 
@@ -71,59 +71,59 @@ jobs:
           echo "[+] Output files:"
           ls -lh output/
 
-      # ── 7. Push output to auto/generate-assets ────────────────────────────
+      # ── 7. Commit & push to auto/generate-assets ──────────────────────────
       - name: 📤 Commit & push to auto/generate-assets
+        id: push
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Create or reset the feature branch from current HEAD
-          git checkout -B auto/generate-assets
+          # Always start the feature branch fresh from main
+          git checkout -B auto/generate-assets origin/main
 
           git add output/
-          
-          # Only commit if there is actually something new
+
           if git diff --cached --quiet; then
-            echo "[*] No changes to commit — output matches last run."
-            echo "SKIP_MERGE=true" >> "$GITHUB_ENV"
+            echo "[*] No changes — output is identical to last run."
+            echo "HAS_CHANGES=false" >> "$GITHUB_ENV"
           else
             git commit -m "🤖 chore: auto-generated AI dialogue & map [skip ci]"
             git push origin auto/generate-assets --force
             echo "[+] Pushed to auto/generate-assets."
-            echo "SKIP_MERGE=false" >> "$GITHUB_ENV"
+            echo "HAS_CHANGES=true" >> "$GITHUB_ENV"
           fi
 
-      # ── 8. Open PR (auto/generate-assets → main) ──────────────────────────
+      # ── 8. Open PR using create-pull-request action ──────────────────────
       - name: 📬 Create Pull Request → main
-        id: cpr
-        if: env.SKIP_MERGE == 'false'
+        id: create_pr
+        if: env.HAS_CHANGES == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GH_PAT }}
-          base: main                          # ← merge TARGET
-          branch: auto/generate-assets        # ← merge SOURCE
+          base: main
+          branch: auto/generate-assets
           commit-message: "🤖 chore: auto-generated AI dialogue & map"
           title: "🤖 Automated: Add generated AI assets"
           body: |
             ## 🧠 Auto-generated Assets
 
-            | Field       | Value                        |
-            |-------------|------------------------------|
-            | Triggered   | `workflow_dispatch`          |
-            | Branch      | `auto/generate-assets → main`|
-            | Output dir  | `output/`                    |
+            | Field     | Value                         |
+            |-----------|-------------------------------|
+            | Triggered | workflow_dispatch             |
+            | Branch    | auto/generate-assets → main   |
+            | Output    | output/                       |
 
-            Auto-merged by the workflow immediately after creation.
+            Auto-merged by workflow immediately after creation.
           labels: automated
-          delete-branch: false   # keep the branch; we delete it after merge below
+          delete-branch: false
 
-      # ── 9. Auto-merge with retry ───────────────────────────────────────────
-      - name: 🔄 Auto-merge PR into main (with retry)
-        if: env.SKIP_MERGE == 'false' && steps.cpr.outputs.pull-request-number != ''
+            # ── 9. Auto-merge with retry ───────────────────────────────────────────
+      - name: 🔄 Auto-merge PR into main
+        if: env.HAS_CHANGES == 'true' && steps.create_pr.outputs.pull-request-number
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          PR="${{ steps.cpr.outputs.pull-request-number }}"
+          PR="${{ steps.create_pr.outputs.pull-request-number }}"
           echo "[*] Merging PR #$PR into main..."
 
           MAX=6
@@ -131,29 +131,27 @@ jobs:
           while [ $ATTEMPT -le $MAX ]; do
             echo "[*] Attempt $ATTEMPT/$MAX..."
             if gh pr merge "$PR" --merge --admin --delete-branch; then
-              echo "[+] PR #$PR merged successfully into main."
+              echo "[+] PR #$PR merged successfully into main. ✅"
               exit 0
             fi
             WAIT=$(( ATTEMPT * 8 ))
-            echo "[!] Attempt $ATTEMPT failed. Waiting ${WAIT}s before retry..."
+            echo "[!] Attempt $ATTEMPT failed. Retrying in ${WAIT}s..."
             sleep $WAIT
             ATTEMPT=$(( ATTEMPT + 1 ))
           done
 
-          echo "[!] All $MAX merge attempts failed. Check branch protection rules."
+          echo "[!] All $MAX merge attempts failed."
           exit 1
 
-      # ── 10. Confirm main is up to date ────────────────────────────────────
-      - name: ✅ Confirm main branch received the changes
-        if: env.SKIP_MERGE == 'false'
+      # ── 10. Confirm ────────────────────────────────────────────────────────
+      - name: ✅ Confirm main received the changes
+        if: env.HAS_CHANGES == 'true'
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           git fetch origin main
-          LATEST=$(git log origin/main --oneline -1)
-          echo "[+] main HEAD is now: $LATEST"
+          echo "[+] main HEAD is now: $(git log origin/main --oneline -1)"
 
-      # ── 11. Nothing-to-do notice ───────────────────────────────────────────
-      - name: ⏭️ No changes detected — skipped merge
-        if: env.SKIP_MERGE == 'true'
-        run: echo "[*] Output identical to last run. No PR or merge needed."
+      - name: ⏭️ No changes — skipped
+        if: env.HAS_CHANGES == 'false'
+        run: echo "[*] Output identical to last run. No PR needed."
