@@ -87,5 +87,5 @@ jobs:
         run: |
           echo "[*] Waiting 5 seconds for GitHub API to process PR mergeability..."
           sleep 5
-          echo "[*] Attempting to auto-merge PR #${{ steps.cpr.outputs.pull-request-number }}"
-          gh pr merge ${{ steps.cpr.outputs.pull-request-number }} --merge --delete-branch
+          echo "[*] Attempting to auto-merge PR #${{ steps.cpr.outputs.pull-request-number }} with Admin privileges"
+          gh pr merge ${{ steps.cpr.outputs.pull-request-number }} --merge --admin --delete-branch
