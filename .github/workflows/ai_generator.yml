@@ -32,13 +32,19 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: python engines/dialogue_generator.py
 
-      - name: 🔄 Sync with remote before pushing
+      - name: Check for changes
+        id: git-check
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin main
+          # fetch remote ref (best-effort)
+          git fetch origin "${{ github.ref }}" || true
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: 📤 Auto Commit and Push
+        if: steps.git-check.outputs.changed == 'true'
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "🤖 chore: auto-generated AI dialogue & map [skip ci]"
