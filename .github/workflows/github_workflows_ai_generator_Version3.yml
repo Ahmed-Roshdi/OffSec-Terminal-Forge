@@ -1,12 +1,7 @@
-name: 🧠 AI Dialogue Generator (Auto PR)
+name: 🧠 Workflow-Output (AI Generator)
 
 on:
   workflow_dispatch:
-    inputs:
-      draft:
-        description: 'Open PR as draft?'
-        required: false
-        default: 'true'
 
 permissions:
   contents: write
@@ -18,9 +13,8 @@ concurrency:
 
 jobs:
   generate-and-open-pr:
-    name: 🚀 Generate Cyberpunk Assets and Open PR
+    name: 🚀 Generate Assets & Open PR
     runs-on: ubuntu-latest
-    timeout-minutes: 30
 
     steps:
       - name: 📥 Checkout repository
@@ -28,41 +22,34 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
       - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
 
       - name: 📦 Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          else
-            pip install Pillow
-          fi
-
-      - name: ✅ Check required secrets
-        run: |
-          if [ -z "${{ secrets.GROQ_API_KEY }}" ]; then
-            echo "ERROR: GROQ_API_KEY is not set. Add it to repository secrets."
-            exit 1
-          fi
+          pip install Pillow
 
       - name: 🌌 Generate assets (map + dialogue)
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           python engines/alien_generator.py
+          
+          echo "[*] Waiting 2 seconds before starting dialogue generator..."
+          sleep 2
+          
           python engines/dialogue_generator.py || echo "dialogue generator failed, using fallback"
+
+      - name: ⏳ I/O Buffer Wait & Verify
+        run: |
+          echo "[*] Waiting 5 seconds for OS I/O operations to flush..."
+          sleep 5
+          echo "[*] Verifying output directory contents:"
+          ls -la output/maps/ || echo "Maps directory not found!"
+          ls -la output/dialogues/ || echo "Dialogues directory not found!"
 
       - name: 📤 Create Pull Request
         uses: peter-evans/create-pull-request@v5
@@ -77,4 +64,3 @@ jobs:
             - Generated files live under `output/`
             - Please review before merging.
           labels: automated
-          draft: ${{ github.event.inputs.draft == 'true' }}
