@@ -9,12 +9,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Checkout Repository via Deploy Key
+      - name: 📥 Checkout Repository
         uses: actions/checkout@v4
         with:
-          ssh-key: ${{ secrets.DEPLOY_KEY }}
-          ref: main
-          fetch-depth: 0 # <--- هذا السطر هو الحل السحري لمشاكل الرفع
+          fetch-depth: 0
 
       - name: 🐍 Setup Python Environment
         uses: actions/setup-python@v5
