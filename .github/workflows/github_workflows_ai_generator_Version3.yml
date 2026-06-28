@@ -80,8 +80,8 @@ jobs:
 
           git commit -m "chore: auto-generated AI dialogue & map [skip ci]"
 
-          # push branch; retry once on transient error
-          git push --set-upstream origin "$BRANCH" || (sleep 2 && git push --set-upstream origin "$BRANCH")
+          # push branch with force-with-lease to handle existing branches safely
+          git push --set-upstream origin "$BRANCH" --force-with-lease || (sleep 2 && git push --set-upstream origin "$BRANCH" --force-with-lease)
 
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
 
