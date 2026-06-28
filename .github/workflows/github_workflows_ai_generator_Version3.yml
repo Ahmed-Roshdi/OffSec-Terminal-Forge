@@ -1,12 +1,7 @@
-name: 🧠 AI Dialogue Generator (Auto PR)
+name: 🧠 Workflow-Output (AI Generator)
 
 on:
   workflow_dispatch:
-    inputs:
-      draft:
-        description: 'Open PR as draft?'
-        required: false
-        default: 'false'
 
 permissions:
   contents: write
@@ -20,6 +15,7 @@ jobs:
   generate-and-open-pr:
     name: 🚀 Generate Cyberpunk Assets and Open PR
     runs-on: ubuntu-latest
+    environment: Dialogue_Generator-AI  # <-- ربط البيئة التي تحتوي على الأسرار
     timeout-minutes: 30
 
     steps:
@@ -27,14 +23,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
 
       - name: 🐍 Setup Python
         uses: actions/setup-python@v5
@@ -44,24 +32,29 @@ jobs:
       - name: 📦 Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          else
-            pip install Pillow
-          fi
+          pip install Pillow
 
       - name: ✅ Check required secrets
         run: |
           if [ -z "${{ secrets.GROQ_API_KEY }}" ]; then
-            echo "ERROR: GROQ_API_KEY is not set. Add it to repository secrets."
+            echo "[!] ERROR: GROQ_API_KEY is missing from the environment."
             exit 1
           fi
+          if [ -z "${{ secrets.GH_PAT }}" ]; then
+            echo "[!] ERROR: GH_PAT is missing from the environment."
+            exit 1
+          fi
+          echo "[+] All secrets loaded successfully from Dialogue_Generator-AI environment."
 
       - name: 🌌 Generate assets (map + dialogue)
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           python engines/alien_generator.py
+          
+          echo "[*] Waiting 2 seconds before starting dialogue generator..."
+          sleep 2
+          
           python engines/dialogue_generator.py || echo "dialogue generator failed, using fallback"
 
       - name: 📤 Create Pull Request
