@@ -281,3 +281,16 @@ def test_dialogue_generation():
 
 if __name__ == "__main__":
     test_dialogue_generation()
+
+import time
+import os
+
+# ... (الكود الخاص بك لتوليد وحفظ الصورة) ...
+
+# التأكد من كتابة الملف على القرص
+if os.path.exists(output_path):
+    print(f"[*] Verified: File successfully written to disk at {output_path}")
+    # تأخير زمني بسيط للسماح لنظام التشغيل بإنهاء عمليات الإدخال والإخراج
+    time.sleep(2)
+else:
+    print(f"[!] Warning: File not found at {output_path} after generation!")
