@@ -32,6 +32,12 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: python engines/dialogue_generator.py
 
+      - name: 🔄 Sync with remote before pushing
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+
       - name: 📤 Auto Commit and Push
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
