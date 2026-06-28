@@ -85,5 +85,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
+          echo "[*] Waiting 5 seconds for GitHub API to process PR mergeability..."
+          sleep 5
           echo "[*] Attempting to auto-merge PR #${{ steps.cpr.outputs.pull-request-number }}"
           gh pr merge ${{ steps.cpr.outputs.pull-request-number }} --merge --delete-branch
