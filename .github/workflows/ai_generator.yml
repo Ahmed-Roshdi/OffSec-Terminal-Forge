@@ -7,12 +7,13 @@ jobs:
   generate-and-push:
     name: 🚀 Generate Cyberpunk Assets
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
-      - name: 📥 Checkout Repository
+      - name: 📥 Checkout Repository via Deploy Key
         uses: actions/checkout@v4
+        with:
+          ssh-key: ${{ secrets.DEPLOY_KEY }}
+          ref: main
 
       - name: 🐍 Setup Python Environment
         uses: actions/setup-python@v5
@@ -32,16 +33,8 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: python engines/dialogue_generator.py
 
-      - name: 📤 Commit and Push Changes
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          
-          # إجبار Git على إضافة الملفات حتى لو كانت في gitignore
-          git add --force output/
-          
-          git commit -m "🤖 chore: auto-generated AI dialogue & map [skip ci]" || echo "No changes to commit"
-          
-          # مزامنة الخادم مع المستودع قبل الرفع لتجنب الرفض
-          git pull --rebase origin main
-          git push
+      - name: 📤 Auto Commit and Push
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "🤖 chore: auto-generated AI dialogue & map [skip ci]"
+          file_pattern: 'output/'
