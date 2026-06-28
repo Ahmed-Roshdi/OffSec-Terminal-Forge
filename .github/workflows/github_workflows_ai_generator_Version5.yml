@@ -78,15 +78,25 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Always start the feature branch fresh from main
+          echo "[*] Current branch: $(git branch --show-current)"
+          echo "[*] Checking out auto/generate-assets from origin/main..."
+          
+          git fetch origin main
           git checkout -B auto/generate-assets origin/main
+          
+          echo "[*] Branch switched. Current status:"
+          git status
 
           git add output/
+          
+          echo "[*] Staged files:"
+          git diff --cached --name-only
 
           if git diff --cached --quiet; then
             echo "[*] No changes — output is identical to last run."
             echo "HAS_CHANGES=false" >> "$GITHUB_ENV"
           else
+            echo "[*] Changes detected. Committing..."
             git commit -m "🤖 chore: auto-generated AI dialogue & map [skip ci]"
             git push origin auto/generate-assets --force
             echo "[+] Pushed to auto/generate-assets."
