@@ -1,54 +1,124 @@
-# OffSec-Terminal-Forge
+<div align="center">
 
-[![Workflow-Output](https://github.com/Ahmed-Roshdi/OffSec-Terminal-Forge/actions/workflows/Workflow-Output.yml/badge.svg?event=workflow_dispatch)](https://github.com/Ahmed-Roshdi/OffSec-Terminal-Forge/actions/workflows/Workflow-Output.yml)
+# 🤖 OffSec-Terminal-Forge
 
-Autonomous Python generation engine for Cyberpunk / Offensive Security-themed visual and narrative assets: AI-driven dialogues and animated WebP terminal HUD sequences.
+**A self-updating cyberpunk terminal — AI-generated alien worlds and security dialogues,
+rebuilt automatically on every workflow run.**
 
-## Architecture (active pipeline)
+[![Workflow](https://github.com/Ahmed-Roshdi/OffSec-Terminal-Forge/actions/workflows/Workflow-Output.yml/badge.svg)](https://github.com/Ahmed-Roshdi/OffSec-Terminal-Forge/actions/workflows/Workflow-Output.yml)
+![Last Commit](https://img.shields.io/github/last-commit/Ahmed-Roshdi/OffSec-Terminal-Forge?color=00ffff)
+![Language](https://img.shields.io/badge/language-Python%203.11-blue?logo=python)
+![Model](https://img.shields.io/badge/AI-Groq%20%7C%20Llama%203.3%2070B-8a2be2)
 
-| Layer | Module | Output |
-|---|---|---|
-| Narrative (Groq) | `engines/ai_engine.py` | `output/dialogues/ai_dialogue_raw_*.json` |
-| Presentation | `engines/dialogue_generator.py` | `output/dialogues/dialogue_seq_*.webp` |
+</div>
 
-Data generation (Groq API) is decoupled from rendering (Pillow). GitHub Actions runs **ai_engine → dialogue_generator** only.
+---
 
-Other engines (`alien_generator`, `core_engine`) exist separately and are not part of the CI workflow.
+## 🌌 Latest Alien Sector Map
 
-## Run locally
+<div align="center">
+<img src="output/maps/latest_map.webp" width="860" alt="Latest Alien Sector Map" />
+</div>
 
-```bash
-pip install -r requirements.txt
-export GROQ_API_KEY="your-key"   # optional — local fallback scripts used if unset
-python engines/orchestrator.py     # or run ai_engine + dialogue_generator individually
+---
+
+## 💬 Latest AI Dialogue Sequence
+
+<div align="center">
+<img src="output/dialogues/latest_dialogue.webp" width="860" alt="Latest AI Dialogue" />
+</div>
+
+> *Each frame is a new AI-generated exchange. The sequence loops.*
+
+---
+
+## 🧠 How It Works
+
+```
+workflow_dispatch
+      │
+      ▼
+alien_generator.py  ──►  output/maps/alien_sector_XXXX.webp
+                                     latest_map.webp
+      │
+      ▼
+orchestrator.py
+      │
+      ├──► ai_engine.py  ──────────►  Groq API (Llama 3.3 70B)
+      │         │                          │
+      │         ▼                          ▼
+      │    ai_dialogue_raw_{ts}.json  (fallback if API down)
+      │
+      └──► dialogue_generator.py ──►  dialogue_seq_{ts}.webp
+                                       latest_dialogue.webp
+      │
+      ▼
+GitHub Actions PR  ──►  auto-merge into main  ──►  README updates live
 ```
 
-Environment variables:
+### Pipeline Steps
 
-| Variable | Default (local) | CI default |
-|---|---|---|
-| `SCENARIOS_PER_RUN` | `3` | `1` |
-| `GROQ_API_KEY` | — | GitHub secret |
-| `AI_REQUEST` | — | set in workflow |
+| # | Engine | Does |
+|---|--------|------|
+| 1 | `alien_generator.py` | Fractal noise → dot-matrix alien world map |
+| 2 | `ai_engine.py` | Calls Groq API → JSON dialogue script |
+| 3 | `dialogue_generator.py` | JSON → animated WebP HUD with avatar circles |
+| 4 | `Workflow-Output.yml` | Commits output, opens PR, auto-merges to `main` |
 
-Individual steps:
+---
 
-```bash
-python engines/ai_engine.py
-python engines/dialogue_generator.py
+## 🏗️ Repository Structure
+
+```
+OffSec-Terminal-Forge/
+├── .github/workflows/
+│   └── Workflow-Output.yml       # Zero-touch CI/CD pipeline
+├── engines/
+│   ├── orchestrator.py           # CI entrypoint: runs ai_engine → dialogue_generator
+│   ├── ai_engine.py              # Groq API → dialogue JSON scripts
+│   ├── dialogue_generator.py     # JSON scripts → animated WebP HUD sequences
+│   ├── alien_generator.py        # Fractal terrain → dot-matrix maps
+│   ├── core_engine.py            # [PENDING] Earth map glitch processor
+│   └── _fonts.py                 # Shared font resolution (runner + local)
+├── output/
+│   ├── maps/
+│   │   ├── alien_sector_*.webp   # Generated maps (one per run)
+│   │   └── latest_map.webp       # ← README reads this
+│   └── dialogues/
+│       ├── dialogue_seq_*.webp   # Generated sequences (one per run)
+│       └── latest_dialogue.webp  # ← README reads this
+└── assets/
+    ├── fonts/                    # UbuntuMono (monospace terminal font)
+    └── captcha.png               # Easter egg — closing frame of every sequence
 ```
 
-## GitHub Actions
+---
 
-Workflow: `.github/workflows/Workflow-Output.yml`
+## ⚙️ Tech Stack
 
-1. Installs Python 3.11, Ubuntu Mono fonts, and dependencies
-2. Runs `ai_engine.py` then `dialogue_generator.py`
-3. Force-stages `output/` and opens PR from `auto/generate-assets` → `main`
+| Component       | Technology                        |
+|-----------------|-----------------------------------|
+| AI Model        | Groq API — Llama 3.3 70B Versatile |
+| Fallback        | Local procedural dialogue generator |
+| Image Engine    | Python Pillow (PIL) 12.x          |
+| Terrain         | Fractal Brownian Motion (fBm)     |
+| Output Format   | Animated WebP (lossless)          |
+| CI/CD           | GitHub Actions — ubuntu-latest    |
+| Auto-merge      | `gh pr merge --admin`             |
 
-Required secrets (environment `Dialogue_Generator-AI`):
+---
 
-- `GROQ_API_KEY` — Groq API (llama-3.3-70b-versatile)
-- `GH_PAT` — PAT with repo + PR permissions for push/merge
+## 🔒 Secrets Required
 
-Trigger manually: **Actions → Workflow-Output (AI Generator) → Run workflow**
+| Secret | Environment | Purpose |
+|--------|-------------|---------|
+| `GROQ_API_KEY` | `Dialogue_Generator-AI` | Llama 3.3 70B via Groq |
+| `GH_PAT` | `Dialogue_Generator-AI` | Push branches + auto-merge PRs |
+
+---
+
+<div align="center">
+
+*Runs on every `workflow_dispatch`. No humans required.*
+
+</div>

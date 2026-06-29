@@ -1,0 +1,236 @@
+name: 🧠 Workflow-Output (AI Generator)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ai-generator
+  cancel-in-progress: true
+
+jobs:
+  generate-and-merge:
+    name: 🚀 Generate Cyberpunk Assets → Push → Merge to Main
+    runs-on: ubuntu-latest
+    environment: Dialogue_Generator-AI
+    timeout-minutes: 30
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+
+      # ── 2. Python ──────────────────────────────────────────────────────────
+      - name: 🐍 Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # ── 3. Dependencies ────────────────────────────────────────────────────
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install Pillow requests
+
+      # ── 4. Secrets check ───────────────────────────────────────────────────
+      - name: ✅ Verify secrets are present
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          MISSING=0
+          [ -z "$GROQ_API_KEY" ] && echo "[!] GROQ_API_KEY is missing." && MISSING=1
+          [ -z "$GH_PAT"       ] && echo "[!] GH_PAT is missing."       && MISSING=1
+          [ "$MISSING" -eq 1 ] && exit 1
+          echo "[+] All secrets loaded from Dialogue_Generator-AI."
+
+      # ── 5. Diagnose Groq API key ───────────────────────────────────────────
+      # Sends one real request BEFORE running Python scripts.
+      # Shows exact HTTP status so we know immediately if the key is wrong.
+      # Does NOT fail the workflow — fallback dialogue still produces valid output.
+      - name: 🔑 Diagnose Groq API key
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "[*] Key length : ${#GROQ_API_KEY} characters"
+          echo "[*] Key prefix : ${GROQ_API_KEY:0:8}..."
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          if [[ "$GROQ_API_KEY" != gsk_* ]]; then
+            echo "[!] WRONG FORMAT — key does not start with 'gsk_'"
+            echo "    → Regenerate at https://console.groq.com/keys"
+            echo "    → Update secret GROQ_API_KEY in environment Dialogue_Generator-AI"
+            echo "GROQ_OK=false" >> "$GITHUB_ENV"
+          else
+            echo "[+] Format OK (starts with gsk_)"
+            HTTP_STATUS=$(curl -s -o /tmp/groq_resp.json -w "%{http_code}" \
+              -X POST https://api.groq.com/openai/v1/chat/completions \
+              -H "Authorization: Bearer $GROQ_API_KEY" \
+              -H "Content-Type: application/json" \
+              -d '{"model":"llama-3.1-8b-instant","messages":[{"role":"user","content":"Reply: OK"}],"max_tokens":3}')
+
+            echo "[*] HTTP Status : $HTTP_STATUS"
+            case "$HTTP_STATUS" in
+              200)
+                echo "[+] Groq API key VALID ✅"
+                echo "GROQ_OK=true" >> "$GITHUB_ENV"
+                ;;
+              401)
+                echo "[!] 401 Unauthorized — key is INVALID or MALFORMED"
+                echo "    → Regenerate at https://console.groq.com/keys"
+                cat /tmp/groq_resp.json
+                echo "GROQ_OK=false" >> "$GITHUB_ENV"
+                ;;
+              403)
+                echo "[!] 403 Forbidden — key REVOKED or quota EXCEEDED"
+                echo "    → Check: https://console.groq.com/keys"
+                echo "    → Free tier: 500K tokens/day, 14.4K tokens/min"
+                cat /tmp/groq_resp.json
+                echo "GROQ_OK=false" >> "$GITHUB_ENV"
+                ;;
+              429)
+                echo "[!] 429 Rate limit — key is valid, wait 60s and retry"
+                echo "GROQ_OK=false" >> "$GITHUB_ENV"
+                ;;
+              *)
+                echo "[!] Unexpected HTTP $HTTP_STATUS"
+                cat /tmp/groq_resp.json
+                echo "GROQ_OK=false" >> "$GITHUB_ENV"
+                ;;
+            esac
+          fi
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "[*] Continuing — fallback dialogue available if Groq is down."
+
+      # ── 6. Generate alien map ──────────────────────────────────────────────
+      - name: 🌍 Generate alien map
+        run: python engines/alien_generator.py
+
+      # ── 7. Run AI dialogue pipeline ────────────────────────────────────────
+      # Uses orchestrator.py as the single entrypoint.
+      # This is critical: orchestrator sets PIPELINE_RUN_TS in its own process
+      # and passes it to ai_engine AND dialogue_generator in the same process tree.
+      # Calling ai_engine and dialogue_generator as separate steps would lose
+      # PIPELINE_RUN_TS between steps (env vars don't persist across steps).
+      - name: 🧠 Run AI dialogue pipeline (orchestrator)
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          SCENARIOS_PER_RUN: "1"
+        run: python engines/orchestrator.py
+
+      # ── 8. Verify output ───────────────────────────────────────────────────
+      - name: 🔍 Verify output files were created
+        run: |
+          echo "[*] Files in output/:"
+          find output/ -type f | sort
+          COUNT=$(find output/ -type f | wc -l)
+          echo "[*] Total: $COUNT files"
+          WEBP=$(find output/ -name "*.webp" | wc -l)
+          echo "[*] WebP files: $WEBP"
+          if [ "$COUNT" -eq 0 ]; then
+            echo "[!] output/ is empty — nothing to commit. Aborting."
+            exit 1
+          fi
+
+      # ── 9. Commit & push to auto/generate-assets ──────────────────────────
+      #
+      # IMPORTANT ORDER:
+      #   1. fetch origin/main         — get latest state of main
+      #   2. checkout from origin/main — clean branch base (no stale history)
+      #   3. git add -f output/        — force-add bypasses .gitignore on output/
+      #   4. diff → commit → push
+      #
+      # git add AFTER checkout (not before) ensures the staging area is clean.
+      # origin/main as base ensures the PR diff is exactly the new output files.
+      #
+      - name: 📤 Commit & push to auto/generate-assets
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin main
+          git checkout -B auto/generate-assets origin/main
+
+          git add -f output/
+
+          echo "[*] Staged files:"
+          git diff --cached --name-only
+
+          if git diff --cached --quiet; then
+            echo "[*] No new files — output identical to last run."
+            echo "HAS_CHANGES=false" >> "$GITHUB_ENV"
+          else
+            git commit -m "🤖 chore: auto-generated AI dialogue & map [skip ci]"
+            git push origin auto/generate-assets --force
+            echo "[+] Pushed to auto/generate-assets."
+            echo "HAS_CHANGES=true" >> "$GITHUB_ENV"
+          fi
+
+      # ── 10. Open PR via gh CLI ─────────────────────────────────────────────
+      - name: 📬 Create Pull Request → main
+        if: env.HAS_CHANGES == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          EXISTING=$(gh pr list \
+            --head auto/generate-assets \
+            --base main \
+            --state open \
+            --json number \
+            --jq '.[0].number')
+
+          if [ -n "$EXISTING" ]; then
+            echo "[*] Reusing existing open PR #$EXISTING."
+            echo "PR_NUMBER=$EXISTING" >> "$GITHUB_ENV"
+          else
+            PR_URL=$(gh pr create \
+              --base main \
+              --head auto/generate-assets \
+              --title "🤖 Automated: Add generated AI assets" \
+              --body "$(printf '## 🧠 Auto-generated Assets\n\n| Field | Value |\n|---|---|\n| Triggered | workflow_dispatch |\n| Groq API | %s |\n| Branch | auto/generate-assets → main |\n| Output | output/ |\n\nAuto-merged by workflow.' "${{ env.GROQ_OK }}")" \
+              --label automated)
+            PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
+            echo "[+] Created PR #$PR_NUMBER"
+            echo "PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
+          fi
+
+      # ── 11. Auto-merge with retry ──────────────────────────────────────────
+      - name: 🔄 Auto-merge PR into main
+        if: env.HAS_CHANGES == 'true' && env.PR_NUMBER != ''
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          PR="${{ env.PR_NUMBER }}"
+          MAX=6
+          ATTEMPT=1
+          while [ $ATTEMPT -le $MAX ]; do
+            echo "[*] Merge attempt $ATTEMPT/$MAX for PR #$PR..."
+            if gh pr merge "$PR" --merge --admin --delete-branch; then
+              echo "[+] PR #$PR merged into main ✅"
+              exit 0
+            fi
+            WAIT=$(( ATTEMPT * 8 ))
+            echo "[!] Attempt $ATTEMPT failed. Retrying in ${WAIT}s..."
+            sleep $WAIT
+            ATTEMPT=$(( ATTEMPT + 1 ))
+          done
+          echo "[!] All $MAX merge attempts failed."
+          exit 1
+
+      # ── 12. Confirm ────────────────────────────────────────────────────────
+      - name: ✅ Confirm main received the changes
+        if: env.HAS_CHANGES == 'true'
+        run: |
+          git fetch origin main
+          echo "[+] main HEAD: $(git log origin/main --oneline -1)"
+
+      - name: ⏭️ No changes — skipped
+        if: env.HAS_CHANGES == 'false'
+        run: echo "[*] Output identical to last run. No PR needed."
