@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-dialogue_generator.py
-Cyberpunk/OffSec Dialogue Engine (updated)
+Updated dialogue_generator.py
 
-This version reads a pre-generated script JSON from output/dialogues/ai_dialogue_raw.json
-instead of calling the AI service itself. All original rendering helpers are preserved.
+- Detects all ai_dialogue_raw_*.json files in output/dialogues/
+- For each JSON, builds a WebP sequence: dialogue_seq_{basename}.webp
+- Improved visuals: avatar circles with initials, per-robot color hashing, slightly wider bubbles, longer wrap
+- If no JSONs found, falls back to built-in fallback dialogues and renders one sequence
 """
 from __future__ import annotations
 import json
@@ -12,10 +13,10 @@ import os
 import random
 import textwrap
 import time
-from datetime import datetime
+import glob
 from typing import List, Dict, Tuple, Optional
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 import alien_generator
 
@@ -28,15 +29,15 @@ FONT_PATH     = os.path.join(ASSETS_DIR, "fonts", "UbuntuMono-R.ttf")
 FALLBACK_FONT = "/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf"
 
 # ── Visual constants ────────────────────────────────────────────────────────
-CANVAS_W      = 1200
-CANVAS_H      = 800
+CANVAS_W      = 1400   # slightly wider for longer text
+CANVAS_H      = 900
 BG_COLOR      = (9, 10, 15)
-SCANLINE_ALPHA = 40
-BUBBLE_WRAP   = 40      # chars per line in a chat bubble
-BUBBLE_PAD    = 15      # vertical gap between bubbles
-FRAME_DURATION_CHAT   = 1800   # ms per dialogue frame
-FRAME_DURATION_BG     = 3000   # ms for the initial map frame
-FRAME_DURATION_FINAL  = 10000  # ms for the closing captcha frame
+SCANLINE_ALPHA = 36
+BUBBLE_WRAP   = 48      # increased wrap
+BUBBLE_PAD    = 18
+FRAME_DURATION_CHAT   = 2000
+FRAME_DURATION_BG     = 3200
+FRAME_DURATION_FINAL  = 10000
 
 # ── Fallback dialogues (kept) ───────────────────────────────────────────────
 FALLBACK_DIALOGUES = [
@@ -65,7 +66,7 @@ FALLBACK_DIALOGUES = [
 # ── Font loader ────────────────────────────────────────────────────────────
 def _load_fonts() -> dict:
     """Load UbuntuMono at three sizes; fall back to PIL default on failure."""
-    sizes = {"chat": 22, "name": 18, "decal": 12}
+    sizes = {"chat": 24, "name": 18, "decal": 12}
     candidates = [FONT_PATH, FALLBACK_FONT]
     for path in candidates:
         if os.path.exists(path):
@@ -76,226 +77,171 @@ def _load_fonts() -> dict:
     default = ImageFont.load_default()
     return {key: default for key in sizes}
 
-# ── Script file loader (new)────────────────────────────────────────────────
-def load_script_from_file(filepath: Optional[str] = None) -> Optional[List[Dict]]:
-    """
-    Read the generated ai_dialogue_raw.json and return the script list or None.
-    Expected structure:
-    {
-      "meta": { ... },
-      "script": [ {"user":"UNIT-7A","text":"...","align":"left"}, ... ]
-    }
-    """
-    if filepath is None:
-        filepath = os.path.join(DIALOGUES_DIR, "ai_dialogue_raw.json")
-    if not os.path.exists(filepath):
-        print(f"WARNING: {filepath} not found. Using fallback.")
-        return None
+# ── Visual helpers ────────────────────────────────────────────────────────
+def _apply_scanlines(image: Image.Image) -> Image.Image:
+    overlay = Image.new("RGBA", image.size, (0,0,0,0))
+    draw = ImageDraw.Draw(overlay)
+    for y in range(0, image.height, 3):
+        draw.line([(0,y),(image.width,y)], fill=(0,0,0,SCANLINE_ALPHA), width=1)
+    return Image.alpha_composite(image.convert("RGBA"), overlay).convert("RGB")
+
+def _text_size(draw: ImageDraw.ImageDraw, text: str, font) -> Tuple[int,int]:
+    try:
+        bbox = draw.textbbox((0,0), text, font=font)
+        return bbox[2]-bbox[0], bbox[3]-bbox[1]
+    except AttributeError:
+        return draw.textsize(text, font=font)
+
+def _bubble_height(draw: ImageDraw.ImageDraw, text: str, font) -> int:
+    lines = textwrap.wrap(text, width=BUBBLE_WRAP)
+    total = sum(_text_size(draw, line, font)[1] + 6 for line in lines)
+    return total + 70
+
+def _color_for_name(name: str) -> Tuple[int,int,int]:
+    # deterministic color from name
+    h = abs(hash(name)) % (256**3)
+    r = (h >> 16) & 0xFF
+    g = (h >> 8) & 0xFF
+    b = h & 0xFF
+    # boost contrast
+    return (max(30, r), max(40, g), max(50, b))
+
+def _initials(name: str) -> str:
+    parts = name.replace('-', ' ').split()
+    if len(parts) == 1:
+        return parts[0][:2].upper()
+    return (parts[0][0] + parts[-1][0]).upper()
+
+def _draw_avatar(draw: ImageDraw.ImageDraw, x: int, y: int, size: int, name: str, font) -> None:
+    col = _color_for_name(name)
+    bbox = [x, y, x+size, y+size]
+    draw.ellipse(bbox, fill=col)
+    init = _initials(name)
+    w,h = _text_size(draw, init, font)
+    draw.text((x + (size-w)/2, y + (size-h)/2), init, fill=(255,255,255), font=font)
+
+def _draw_bubble(draw: ImageDraw.ImageDraw, text: str, x: int, y: int, align: str, fonts: dict, user_name: str, decal: str) -> None:
+    lines = textwrap.wrap(text, width=BUBBLE_WRAP)
+    line_dims = [_text_size(draw, line, fonts["chat"]) for line in lines]
+    max_w = max((w for w,_ in line_dims), default=0)
+    prefix = ">_ " if align == "left" else ">> "
+    name_w, _ = _text_size(draw, f"{prefix}{user_name}", fonts["name"])
+    decal_w, _ = _text_size(draw, decal, fonts["decal"])
+    box_w = max(max_w + 60, name_w + decal_w + 60)
+    box_h = sum(h + 6 for _,h in line_dims) + 60
+    cut = 18
+
+    # avatar position
+    avatar_size = 56
+    if align == "left":
+        bg_color = (18,24,28)
+        border = (0,220,220)
+        text_color = (220,255,255)
+        box_x = x + avatar_size + 20
+        avatar_x = x
+    else:
+        bg_color = (28,18,24)
+        border = (255,40,200)
+        text_color = (255,210,240)
+        box_x = x - box_w - avatar_size - 20
+        avatar_x = x - avatar_size
+
+    # draw rounded-ish polygon (approx with polygon)
+    pts = [
+        (box_x + cut, y), (box_x + box_w, y),
+        (box_x + box_w, y + box_h - cut), (box_x + box_w - cut, y + box_h),
+        (box_x, y + box_h), (box_x, y + cut),
+        (box_x + cut, y)
+    ]
+    draw.polygon(pts, fill=bg_color)
+    draw.line(pts, fill=border, width=2)
+    draw.line([(box_x, y + 28), (box_x + box_w, y + 28)], fill=border, width=1)
+
+    # draw avatar
+    try:
+        _draw_avatar(draw, avatar_x, y, avatar_size, user_name, fonts["name"])
+    except Exception:
+        pass
+
+    draw.text((box_x + 12, y + 6), f"{prefix}{user_name}", fill=border, font=fonts["name"])
+    draw.text((box_x + box_w - decal_w - 16, y + 10), decal, fill=(140,140,140), font=fonts["decal"])
+    text_y = y + 36
+    for (_, h), line in zip(line_dims, lines):
+        draw.text((box_x + 16, text_y), line, fill=text_color, font=fonts["chat"])
+        text_y += h + 6
+
+# ── Frame builders ─────────────────────────────────────────────────────────
+def _build_chat_frame(visible: List[Dict], fonts: dict, width: int, height: int) -> Image.Image:
+    canvas = Image.new("RGB", (width, height), color=BG_COLOR)
+    draw = ImageDraw.Draw(canvas)
+    cur_y = 40
+    for msg in visible:
+        x_pos = 80 if msg["align"] == "left" else width - 80
+        _draw_bubble(draw, msg["text"], x_pos, cur_y, msg["align"], fonts, msg["user"], msg.get("decal",""))
+        cur_y += msg["height"] + BUBBLE_PAD
+    return _apply_scanlines(canvas)
+
+def _build_captcha_frame(fonts: dict, width: int, height: int) -> Image.Image:
+    canvas = Image.new("RGB", (width, height), color=BG_COLOR)
+    captcha_path = os.path.join(ASSETS_DIR, "captcha.png")
+    if os.path.exists(captcha_path):
+        cap = Image.open(captcha_path).convert("RGBA")
+        max_w = 520
+        if cap.width > max_w:
+            ratio = max_w / cap.width
+            cap = cap.resize((max_w, int(cap.height * ratio)), Image.Resampling.LANCZOS)
+        cx = (width - cap.width)//2
+        cy = (height - cap.height)//2
+        canvas.paste(cap, (cx, cy), cap)
+    else:
+        draw = ImageDraw.Draw(canvas)
+        draw.text((width//2-200, height//2), "[MISSING: assets/captcha.png]", fill=(255,0,0), font=fonts["chat"])
+    return _apply_scanlines(canvas)
+
+# ── JSON loader ───────────────────────────────────────────────────────────
+def load_script_from_json_file(filepath: str) -> Optional[List[Dict]]:
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
         script = data.get("script")
         if isinstance(script, list) and len(script) > 0:
-            # Basic shape check for each message
-            for idx, m in enumerate(script):
-                if not isinstance(m, dict) or not {"user", "text", "align"}.issubset(set(m.keys())):
-                    print(f"WARNING: script item #{idx} missing required keys; ignoring file.")
-                    return None
             return script
-        print("WARNING: 'script' key missing or empty in file.")
-        return None
     except Exception as e:
-        print(f"ERROR reading {filepath}: {e}")
-        return None
+        print(f"[!] Failed to load {filepath}: {e}")
+    return None
 
-# ── Image helpers (kept from original)─────────────────────────────────────
-def _apply_scanlines(image: Image.Image) -> Image.Image:
-    """Overlay subtle horizontal scanlines for a CRT effect."""
-    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
-    draw    = ImageDraw.Draw(overlay)
-    for y in range(0, image.height, 4):
-        draw.line([(0, y), (image.width, y)], fill=(0, 0, 0, SCANLINE_ALPHA), width=1)
-    return Image.alpha_composite(image.convert("RGBA"), overlay).convert("RGB")
+# ── Sequence builder per script ───────────────────────────────────────────
+def generate_dialogue_from_script(script: List[Dict], basename: str, bg_image: Optional[Image.Image] = None) -> str:
+    fonts = _load_fonts()
+    frames: List[Image.Image] = []
+    durations: List[int] = []
 
-def _text_size(draw: ImageDraw.ImageDraw, text: str, font) -> tuple[int, int]:
-    """Return (width, height) for a text string; compatible with old PIL."""
-    try:
-        bbox = draw.textbbox((0, 0), text, font=font)
-        return bbox[2] - bbox[0], bbox[3] - bbox[1]
-    except AttributeError:
-        return draw.textsize(text, font=font)
-
-def _bubble_height(draw: ImageDraw.ImageDraw, text: str, font) -> int:
-    """Compute the total pixel height a chat bubble will occupy."""
-    lines  = textwrap.wrap(text, width=BUBBLE_WRAP)
-    total  = sum(_text_size(draw, line, font)[1] + 5 for line in lines)
-    return total + 60   # top header + bottom padding
-
-def _draw_bubble(
-    draw:      ImageDraw.ImageDraw,
-    text:      str,
-    x:         int,
-    y:         int,
-    align:     str,
-    fonts:     dict,
-    user_name: str,
-    decal:     str,
-) -> None:
-    """Draw a single cyberpunk HUD-style speech bubble."""
-    lines = textwrap.wrap(text, width=BUBBLE_WRAP)
-
-    # Measure each line
-    line_dims = [_text_size(draw, line, fonts["chat"]) for line in lines]
-    max_w     = max((w for w, _ in line_dims), default=0)
-
-    prefix    = ">_ " if align == "left" else ">> "
-    name_w, _ = _text_size(draw, f"{prefix}{user_name}", fonts["name"])
-    decal_w, _= _text_size(draw, decal,                  fonts["decal"])
-
-    box_w = max(max_w + 40, name_w + decal_w + 40)
-    box_h = sum(h + 5 for _, h in line_dims) + 45
-    cut   = 15
-
-    if align == "left":
-        bg_color     = (15, 20, 25)
-        border_color = (0, 255, 255)
-        text_color   = (200, 255, 255)
-        box_x = x
-        pts = [
-            (box_x + cut, y),             (box_x + box_w, y),
-            (box_x + box_w, y + box_h - cut), (box_x + box_w - cut, y + box_h),
-            (box_x, y + box_h),           (box_x, y + cut),
-            (box_x + cut, y),
-        ]
-    else:
-        bg_color     = (25, 15, 25)
-        border_color = (255, 0, 255)
-        text_color   = (255, 200, 255)
-        box_x = x - box_w
-        pts = [
-            (box_x, y),                   (box_x + box_w - cut, y),
-            (box_x + box_w, y + cut),     (box_x + box_w, y + box_h),
-            (box_x + cut, y + box_h),     (box_x, y + box_h - cut),
-            (box_x, y),
-        ]
-
-    draw.polygon(pts, fill=bg_color)
-    draw.line(pts,    fill=border_color, width=2)
-    draw.line([(box_x, y + 25), (box_x + box_w, y + 25)], fill=border_color, width=1)
-
-    draw.text((box_x + 10, y + 4), f"{prefix}{user_name}", fill=border_color, font=fonts["name"])
-    draw.text((box_x + box_w - decal_w - 15, y + 8), decal, fill=(100, 100, 100), font=fonts["decal"])
-
-    text_y = y + 35
-    for (_, h), line in zip(line_dims, lines):
-        draw.text((box_x + 15, text_y), line, fill=text_color, font=fonts["chat"])
-        text_y += h + 5
-
-# ── Frame builders ─────────────────────────────────────────────────────────
-def _build_chat_frame(
-    visible: List[Dict],
-    fonts:   dict,
-    width:   int,
-    height:  int,
-) -> Image.Image:
-    """Render a single chat frame from the list of currently-visible messages."""
-    canvas = Image.new("RGB", (width, height), color=BG_COLOR)
-    draw   = ImageDraw.Draw(canvas)
-    cur_y  = 40
-    for msg in visible:
-        x_pos = 80 if msg["align"] == "left" else width - 80
-        _draw_bubble(draw, msg["text"], x_pos, cur_y, msg["align"],
-                     fonts, msg["user"], msg.get("decal", ""))
-        cur_y += msg["height"] + BUBBLE_PAD
-    return _apply_scanlines(canvas)
-
-def _build_captcha_frame(fonts: dict, width: int, height: int) -> Image.Image:
-    """Render the closing frame with the captcha asset (or an error placeholder)."""
-    canvas      = Image.new("RGB", (width, height), color=BG_COLOR)
-    captcha_path = os.path.join(ASSETS_DIR, "captcha.png")
-
-    if os.path.exists(captcha_path):
-        cap = Image.open(captcha_path).convert("RGBA")
-        max_w = 400
-        if cap.width > max_w:
-            ratio  = max_w / cap.width
-            cap    = cap.resize((max_w, int(cap.height * ratio)), Image.Resampling.LANCZOS)
-        cx = (width  - cap.width)  // 2
-        cy = (height - cap.height) // 2
-        canvas.paste(cap, (cx, cy), cap)
-    else:
-        draw = ImageDraw.Draw(canvas)
-        draw.text(
-            (width // 2 - 150, height // 2),
-            "[MISSING: assets/captcha.png]",
-            fill=(255, 0, 0),
-            font=fonts["chat"],
-        )
-        print("[!] Warning: assets/captcha.png not found.")
-
-    return _apply_scanlines(canvas)
-
-# ── Main sequence generator ─────────────────────────────────────────────────
-def generate_dialogue_sequence(
-    bg_image: Optional[Image.Image] = None,
-    width:    int = CANVAS_W,
-    height:   int = CANVAS_H,
-) -> Tuple[List[Image.Image], List[int]]:
-    """
-    Build the full animated sequence.
-    Returns (frames, durations) ready for WebP export.
-    """
-    print("[*] Initialising Cyberpunk/OffSec Dialogue Engine...")
-    fonts   = _load_fonts()
-    frames:    List[Image.Image] = []
-    durations: List[int]         = []
-
-    # Optional map background as the opening frame
     if bg_image is not None:
         frames.append(bg_image.copy().convert("RGB"))
         durations.append(FRAME_DURATION_BG)
 
-    # NEW: load script from file (generated by ai_engine) or fall back to static
-    script = load_script_from_file() or random.choice(FALLBACK_DIALOGUES)
-
-    # Pre-compute per-message metadata
-    dummy_draw = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+    dummy_draw = ImageDraw.Draw(Image.new("RGB", (1,1)))
     for msg in script:
         msg.setdefault("decal",
-            f"[SYS.AUTH: OK] // HEX:{random.randint(0x1000, 0xFFFF):04X}"
-            if msg["align"] == "left"
-            else f"[NET.UPLINK] // PKT:{random.randint(10, 99)}"
+            f"[SYS] // {random.randint(0x1000,0xFFFF):04X}" if msg["align"] == "left" else f"[NET] // {random.randint(10,99)}"
         )
+        # compute height with chat font
         msg["height"] = _bubble_height(dummy_draw, msg["text"], fonts["chat"])
 
-    # Build one frame per dialogue line (sliding window if content overflows)
     visible: List[Dict] = []
     for msg in script:
         visible.append(msg)
         # Trim from the top if we overflow the canvas
-        while sum(m["height"] + BUBBLE_PAD for m in visible) > (height - 150):
+        while sum(m["height"] + BUBBLE_PAD for m in visible) > (CANVAS_H - 180):
             visible.pop(0)
-        frames.append(_build_chat_frame(visible, fonts, width, height))
+        frames.append(_build_chat_frame(visible, fonts, CANVAS_W, CANVAS_H))
         durations.append(FRAME_DURATION_CHAT)
 
     # Closing captcha frame
-    print("[*] Injecting CAPTCHA asset for closing frame...")
-    frames.append(_build_captcha_frame(fonts, width, height))
+    frames.append(_build_captcha_frame(fonts, CANVAS_W, CANVAS_H))
     durations.append(FRAME_DURATION_FINAL)
 
-    print(f"[+] Sequence built: {len(frames)} frames total.")
-    return frames, durations
-
-# ── Entry point ─────────────────────────────────────────────────────────────
-def main() -> None:
-    os.makedirs(DIALOGUES_DIR, exist_ok=True)
-
-    print("[*] Generating alien map for background...")
-    bg_img, _ = alien_generator.generate_alien_world(save_to_disk=False)
-
-    frames, durations = generate_dialogue_sequence(bg_image=bg_img)
-
-    output_path = os.path.join(DIALOGUES_DIR, f"dialogue_seq_{int(time.time())}.webp")
+    output_path = os.path.join(DIALOGUES_DIR, f"dialogue_seq_{basename}.webp")
     frames[0].save(
         output_path,
         format="WEBP",
@@ -306,14 +252,42 @@ def main() -> None:
         lossless=True,
         quality=100,
     )
-    print(f"[+] Saved: {output_path}")
+    return output_path
 
-    # Verify the file was actually written
-    if os.path.exists(output_path):
-        size_kb = os.path.getsize(output_path) / 1024
-        print(f"[*] Verified: {output_path} ({size_kb:.1f} KB)")
+# ── Main ───────────────────────────────────────────────────────────────────
+def main():
+    os.makedirs(DIALOGUES_DIR, exist_ok=True)
+
+    # generate a single background map and reuse for all sequences
+    print("[*] Generating background map (one for all sequences)...")
+    bg_img, _ = alien_generator.generate_alien_world(save_to_disk=False)
+
+    # find all JSON scenario files
+    pattern = os.path.join(DIALOGUES_DIR, "ai_dialogue_raw_*.json")
+    files = sorted(glob.glob(pattern))
+    if not files:
+        print("[!] No ai_dialogue_raw_*.json files found in output/dialogues. Using fallback single script.")
+        scripts = [random.choice(FALLBACK_DIALOGUES)]
+        names = ["fallback"]
     else:
-        print(f"[!] Warning: file not found after save — check disk/permissions.")
+        scripts = []
+        names = []
+        for p in files:
+            script = load_script_from_json_file(p)
+            if script:
+                scripts.append(script)
+                names.append(os.path.splitext(os.path.basename(p))[0])
+            else:
+                print(f"[!] Skipping invalid JSON file: {p}")
+
+    for script, name in zip(scripts, names):
+        print(f"[*] Rendering sequence for {name} (lines: {len(script)})...")
+        out = generate_dialogue_from_script(script, basename=name, bg_image=bg_img)
+        if os.path.exists(out):
+            size_kb = os.path.getsize(out) / 1024
+            print(f"[+] Saved: {out} ({size_kb:.1f} KB)")
+        else:
+            print(f"[!] Failed to save: {out}")
 
 if __name__ == "__main__":
     main()
