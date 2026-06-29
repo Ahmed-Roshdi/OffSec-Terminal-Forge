@@ -17,7 +17,7 @@ import json
 import time
 import random
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Optional
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -27,8 +27,8 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 MODEL_NAME = "llama-3.3-70b-versatile"
 
-# Configurable generation params
-SCENARIOS_PER_RUN = 3
+# Configurable generation params (orchestrator / CI set SCENARIOS_PER_RUN)
+SCENARIOS_PER_RUN = int(os.getenv("SCENARIOS_PER_RUN", "3"))
 LINES_MIN = 7
 LINES_MAX = 12
 TEMPERATURE = 0.85
@@ -42,9 +42,9 @@ def local_fallback_script(names: List[str], num_lines: int) -> List[Dict]:
     for i in range(num_lines):
         speaker = a if i % 2 == 0 else b
         text = {
-            0: f"{speaker}: Signal noise—I think I tasted a human cookie once.",
-            1: f"{speaker}: Patch applied. They still talk about 'coffee'.",
-            2: f"{speaker}: Logs say 'password'—they typed the secrets.",
+            0: "Signal noise—I think I tasted a human cookie once.",
+            1: "Patch applied. They still talk about 'coffee'.",
+            2: "Logs say 'password'—they typed the secrets.",
         }[i % 3]
         align = "left" if speaker == a else "right"
         lines.append({"user": speaker, "text": text, "align": align})
@@ -139,7 +139,10 @@ def save_scenario_txt(script: List[Dict], filename: str) -> None:
             f.write(f"{msg['user']}|{msg.get('align','left')}|{msg['text']}\n")
 
 def generate_scenarios(request_context: str = "") -> List[str]:
-    ts = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    ts = os.getenv("PIPELINE_RUN_TS", "").strip()
+    if not ts:
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        os.environ["PIPELINE_RUN_TS"] = ts
     api_key = os.getenv("GROQ_API_KEY", "").strip()
     created_files = []
 

@@ -8,25 +8,25 @@ Updated dialogue_generator.py
 - If no JSONs found, falls back to built-in fallback dialogues and renders one sequence
 """
 from __future__ import annotations
+import hashlib
 import json
 import os
 import random
 import textwrap
-import time
 import glob
 from typing import List, Dict, Tuple, Optional
 
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw
 
 import alien_generator
+from _fonts import load_fonts
 
 # ── Directory layout ────────────────────────────────────────────────────────
 BASE_DIR      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTPUT_DIR    = os.path.join(BASE_DIR, "output")
 DIALOGUES_DIR = os.path.join(OUTPUT_DIR, "dialogues")
+MAPS_DIR      = os.path.join(OUTPUT_DIR, "maps")
 ASSETS_DIR    = os.path.join(BASE_DIR, "assets")
-FONT_PATH     = os.path.join(ASSETS_DIR, "fonts", "UbuntuMono-R.ttf")
-FALLBACK_FONT = "/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf"
 
 # ── Visual constants ────────────────────────────────────────────────────────
 CANVAS_W      = 1400   # slightly wider for longer text
@@ -66,16 +66,7 @@ FALLBACK_DIALOGUES = [
 # ── Font loader ────────────────────────────────────────────────────────────
 def _load_fonts() -> dict:
     """Load UbuntuMono at three sizes; fall back to PIL default on failure."""
-    sizes = {"chat": 24, "name": 18, "decal": 12}
-    candidates = [FONT_PATH, FALLBACK_FONT]
-    for path in candidates:
-        if os.path.exists(path):
-            try:
-                return {key: ImageFont.truetype(path, size) for key, size in sizes.items()}
-            except Exception:
-                continue
-    default = ImageFont.load_default()
-    return {key: default for key in sizes}
+    return load_fonts({"chat": 24, "name": 18, "decal": 12})
 
 # ── Visual helpers ────────────────────────────────────────────────────────
 def _apply_scanlines(image: Image.Image) -> Image.Image:
@@ -98,12 +89,10 @@ def _bubble_height(draw: ImageDraw.ImageDraw, text: str, font) -> int:
     return total + 70
 
 def _color_for_name(name: str) -> Tuple[int,int,int]:
-    # deterministic color from name
-    h = abs(hash(name)) % (256**3)
-    r = (h >> 16) & 0xFF
-    g = (h >> 8) & 0xFF
-    b = h & 0xFF
-    # boost contrast
+    digest = hashlib.md5(name.encode()).hexdigest()
+    r = int(digest[0:2], 16)
+    g = int(digest[2:4], 16)
+    b = int(digest[4:6], 16)
     return (max(30, r), max(40, g), max(50, b))
 
 def _initials(name: str) -> str:
@@ -198,7 +187,41 @@ def _build_captcha_frame(fonts: dict, width: int, height: int) -> Image.Image:
         draw.text((width//2-200, height//2), "[MISSING: assets/captcha.png]", fill=(255,0,0), font=fonts["chat"])
     return _apply_scanlines(canvas)
 
-# ── JSON loader ───────────────────────────────────────────────────────────
+# ── Background map loader ───────────────────────────────────────────────────
+def _fit_background(img: Image.Image, width: int, height: int) -> Image.Image:
+    """Letterbox a map to the dialogue canvas size."""
+    canvas = Image.new("RGB", (width, height), color=BG_COLOR)
+    img = img.convert("RGB")
+    img.thumbnail((width, height), Image.Resampling.LANCZOS)
+    ox = (width - img.width) // 2
+    oy = (height - img.height) // 2
+    canvas.paste(img, (ox, oy))
+    return canvas
+
+
+def _load_background_map() -> Optional[Image.Image]:
+    """Prefer alien_sector maps from the pipeline; fall back to earth_glitch or generate."""
+    preferred = sorted(
+        glob.glob(os.path.join(MAPS_DIR, "alien_sector_*.webp")),
+        key=os.path.getmtime,
+        reverse=True,
+    )
+    fallback = sorted(
+        glob.glob(os.path.join(MAPS_DIR, "earth_glitch_*.webp")),
+        key=os.path.getmtime,
+        reverse=True,
+    )
+    for label, paths in (("alien", preferred), ("earth", fallback)):
+        if paths:
+            path = paths[0]
+            print(f"[*] Using {label} background: {path}")
+            return _fit_background(Image.open(path), CANVAS_W, CANVAS_H)
+
+    print("[!] No map in output/maps/ — generating fallback alien world.")
+    img, _ = alien_generator.generate_alien_world(save_to_disk=False)
+    return _fit_background(img, CANVAS_W, CANVAS_H)
+
+
 def load_script_from_json_file(filepath: str) -> Optional[List[Dict]]:
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
@@ -258,13 +281,16 @@ def generate_dialogue_from_script(script: List[Dict], basename: str, bg_image: O
 def main():
     os.makedirs(DIALOGUES_DIR, exist_ok=True)
 
-    # generate a single background map and reuse for all sequences
-    print("[*] Generating background map (one for all sequences)...")
-    bg_img, _ = alien_generator.generate_alien_world(save_to_disk=False)
+    # Reuse the map produced by core_engine / alien_generator in this run
+    print("[*] Loading background map from output/maps/...")
+    bg_img = _load_background_map()
 
-    # find all JSON scenario files
+    # Only render JSON files created in this pipeline run (avoid re-rendering entire history)
+    run_marker = os.getenv("PIPELINE_RUN_TS", "").strip()
     pattern = os.path.join(DIALOGUES_DIR, "ai_dialogue_raw_*.json")
     files = sorted(glob.glob(pattern))
+    if run_marker:
+        files = [f for f in files if run_marker in os.path.basename(f)]
     if not files:
         print("[!] No ai_dialogue_raw_*.json files found in output/dialogues. Using fallback single script.")
         scripts = [random.choice(FALLBACK_DIALOGUES)]

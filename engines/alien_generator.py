@@ -2,7 +2,9 @@
 import os
 import random
 import time
-from PIL import Image, ImageDraw, ImageFont, ImageEnhance
+from PIL import Image, ImageDraw, ImageEnhance
+
+from _fonts import load_fonts
 
 # 1. Dynamic Path Resolution
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -95,15 +97,8 @@ def generate_alien_world(width=1200, height=800, save_to_disk=True):
     sector_id = f"{random.randint(4096, 65535):04X}"
     planet_name = f"SECTOR {sector_id} - UNKNOWN PLANET"
     
-    # Font handling (Fallback mechanism)
-    font_path = os.path.join(ASSETS_DIR, "fonts", "UbuntuMono-R.ttf")
-    try:
-        if os.path.exists(font_path):
-            font = ImageFont.truetype(font_path, 22)
-        else:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf", 22)
-    except Exception:
-        font = ImageFont.load_default()
+    fonts = load_fonts({"label": 22})
+    font = fonts["label"]
         
     # Center the text
     try:
@@ -144,5 +139,5 @@ def generate_multiple_worlds(count=5):
     return generated_files
 
 if __name__ == "__main__":
-    # Test batch generation by creating 3 different planets
-    generate_multiple_worlds(count=3)
+    count = int(os.getenv("MAPS_PER_RUN", "1"))
+    generate_multiple_worlds(count=count)
