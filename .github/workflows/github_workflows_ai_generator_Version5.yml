@@ -76,18 +76,120 @@ jobs:
           fi
 
       # ── 7. Commit & push to auto/generate-assets (safe: stash/restore generated output) ─────
+       - name: 📤 Commit & push to auto/generate-assets
+    run: |
+    set -euo pipefail
+    git config user.name  "github-actions[bot]"
+    git config user.email "github-actions[bot]@users.noreply.github.com"
+
+    echo "[*] Debug: show workspace before stash"
+    pwd
+    git status --porcelain || true
+    ls -la || true
+    echo "[*] list output dir (if exists):"
+    ls -la output || true
+
+    TMPDIR="$(mktemp -d)"
+    echo "[*] Temporary stash dir: $TMPDIR"
+
+    # Move output (dir) to temp; if output is a file, move the file instead
+    if [ -d output ]; name: 🧠 Workflow-Output (AI Generator)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ai-generator
+  cancel-in-progress: true
+
+jobs:
+  generate-and-merge:
+    name: 🚀 Generate Cyberpunk Assets → Push → Merge to Main
+    runs-on: ubuntu-latest
+    environment: Dialogue_Generator-AI
+    timeout-minutes: 30
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+
+      # ── 2. Python ──────────────────────────────────────────────────────────
+      - name: 🐍 Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # ── 3. Dependencies ────────────────────────────────────────────────────
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install Pillow requests
+
+      # ── 4. Secrets check ───────────────────────────────────────────────────
+      - name: ✅ Verify secrets are present
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          MISSING=0
+          [ -z "$GROQ_API_KEY" ] && echo "[!] GROQ_API_KEY is missing." && MISSING=1
+          [ -z "$GH_PAT"       ] && echo "[!] GH_PAT is missing."       && MISSING=1
+          [ "$MISSING" -eq 1 ] && exit 1
+          echo "[+] All secrets loaded from Dialogue_Generator-AI."
+
+      # ── 5. Generate ────────────────────────────────────────────────────────
+      - name: 🌍 Generate alien map
+        run: python engines/alien_generator.py
+
+      - name: 🧠 Generate AI dialogue JSON (ai_engine)
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          python engines/ai_engine.py --request "Generate a cyberpunk security dialogue for Manus (5-8 lines)."
+
+      - name: 💬 Render AI dialogue into WebP (dialogue_generator)
+        run: python engines/dialogue_generator.py
+
+      # ── 6. Verify output ───────────────────────────────────────────────────
+      - name: 🔍 Verify output files were created
+        run: |
+          echo "[*] Files found in output/:"
+          find output/ -type f | head -40
+          COUNT=$(find output/ -type f | wc -l)
+          echo "[*] Total: $COUNT files"
+          if [ "$COUNT" -eq 0 ]; then
+            echo "[!] output/ is empty — nothing to commit. Aborting."
+            exit 1
+          fi
+
+      # ── 7. Commit & push to auto/generate-assets (safe stash & restore) ───
       - name: 📤 Commit & push to auto/generate-assets
         run: |
           set -euo pipefail
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Move current generated output to a temp dir to avoid checkout conflicts
+          echo "[*] Debug: workspace root: $(pwd)"
+          echo "[*] Debug: git status (short):"
+          git status --porcelain || true
+
+          # Stash generated output outside of working tree to avoid checkout conflicts
           TMPDIR="$(mktemp -d)"
           echo "[*] Temporary stash dir: $TMPDIR"
+
           if [ -d output ]; then
-            echo "[*] Stashing generated output to temporary dir"
+            echo "[*] Stashing 'output/' to temporary dir"
             mv output "$TMPDIR"/ || true
+          else
+            echo "[*] No output/ directory to stash"
           fi
 
           # Fetch and create/update branch from origin/main
@@ -96,7 +198,7 @@ jobs:
 
           # Restore stashed generated output (if any)
           if [ -d "$TMPDIR/output" ]; then
-            echo "[*] Restoring generated output"
+            echo "[*] Restoring stashed output/"
             mv "$TMPDIR/output" ./ || true
           fi
           rm -rf "$TMPDIR" || true
@@ -117,6 +219,119 @@ jobs:
             echo "HAS_CHANGES=true" >> "$GITHUB_ENV"
           fi
 
+      # ── 8. Authenticate gh CLI (ensure GH token available) ────────────────
+      - name: 🔐 Authenticate gh CLI
+        if: env.HAS_CHANGES == 'true'
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          set -euo pipefail
+          echo "$GH_PAT" | gh auth login --with-token
+          gh --version
+
+      # ── 9. Create or reuse PR → main ───────────────────────────────────────
+      - name: 📬 Create Pull Request → main
+        if: env.HAS_CHANGES == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          set -euo pipefail
+          EXISTING=$(gh pr list --head auto/generate-assets --base main --state open --json number --jq '.[0].number' 2>/dev/null || true)
+
+          if [ -n "$EXISTING" ]; then
+            echo "[*] Reusing existing open PR #$EXISTING."
+            echo "PR_NUMBER=$EXISTING" >> "$GITHUB_ENV"
+          else
+            PR_URL=$(gh pr create \
+              --base main \
+              --head auto/generate-assets \
+              --title "🤖 Automated: Add generated AI assets" \
+              --body "$(printf '## 🧠 Auto-generated Assets\n\n| Field | Value |\n|---|---|\n| Triggered | workflow_dispatch |\n| Branch | auto/generate-assets → main |\n| Output | output/ |\n\nAutomated generation of alien maps and dialogue sequences.')" \
+              --label automated 2>/dev/null || true)
+            PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$' || true)
+            if [ -n "$PR_NUMBER" ]; then
+              echo "[+] Created PR #$PR_NUMBER"
+              echo "PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
+            else
+              echo "[!] Failed to parse PR number from URL: $PR_URL"
+              echo "PR_NUMBER=" >> "$GITHUB_ENV"
+            fi
+          fi
+
+      # ── 10. Auto-merge PR into main (with retries) ─────────────────────────
+      - name: 🔄 Auto-merge PR into main
+        if: env.HAS_CHANGES == 'true' && env.PR_NUMBER != ''
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          set -euo pipefail
+          PR="${{ env.PR_NUMBER }}"
+          echo "[*] Attempting to merge PR #$PR into main..."
+
+          MAX=6
+          ATTEMPT=1
+          while [ $ATTEMPT -le $MAX ]; do
+            echo "[*] Merge attempt $ATTEMPT/$MAX..."
+            if gh pr merge "$PR" --merge --admin --delete-branch; then
+              echo "[+] PR #$PR merged into main ✅"
+              exit 0
+            fi
+            WAIT=$(( ATTEMPT * 8 ))
+            echo "[!] Attempt $ATTEMPT failed. Retrying in ${WAIT}s..."
+            sleep $WAIT
+            ATTEMPT=$(( ATTEMPT + 1 ))
+          done
+
+          echo "[!] All $MAX merge attempts failed."
+          exit 1
+
+      # ── 11. Confirm ────────────────────────────────────────────────────────
+      - name: ✅ Confirm main received the changes
+        if: env.HAS_CHANGES == 'true'
+        run: |
+          git fetch origin main
+          echo "[+] origin/main HEAD: $(git log origin/main --oneline -1 || true)"
+
+      - name: ⏭️ No changes — skipped
+        if: env.HAS_CHANGES == 'false'
+        run: echo "[*] Output identical to last run. No PR needed."then
+      mv output "$TMPDIR"/ || true
+    elif [ -f output ]; then
+      mkdir -p "$TMPDIR"
+      mv output "$TMPDIR"/ || true
+    else
+      echo "[*] No output/ found to stash."
+    fi
+
+    # Fetch and checkout branch from origin/main (clean base)
+    git fetch origin main
+    git checkout -B auto/generate-assets origin/main
+
+    # Restore stashed output
+    if [ -d "$TMPDIR/output" ]; then
+      mv "$TMPDIR/output" ./ || true
+    elif [ -d "$TMPDIR" ] && [ "$(ls -A $TMPDIR 2>/dev/null || true)" ]; then
+      # fallback: if temp contains something else, move to ./output
+      mkdir -p output
+      mv "$TMPDIR"/* output/ || true
+    fi
+    rm -rf "$TMPDIR" || true
+
+    # Force-add output (even if .gitignore)
+    git add -f output/ || true
+
+    echo "[*] Staged files:"
+    git diff --cached --name-only || true
+
+    if git diff --cached --quiet; then
+      echo "[*] No new files — output identical to last run."
+      echo "HAS_CHANGES=false" >> "$GITHUB_ENV"
+    else
+      git commit -m "🤖 chore: auto-generated AI dialogue & map [skip ci]" || true
+      git push origin auto/generate-assets --force
+      echo "[+] Pushed to auto/generate-assets."
+      echo "HAS_CHANGES=true" >> "$GITHUB_ENV"
+    fi
       # ── 8. Authenticate gh CLI (ensure GH token available for subsequent gh commands) ─────
       - name: 🔐 Authenticate gh CLI
         if: env.HAS_CHANGES == 'true'
