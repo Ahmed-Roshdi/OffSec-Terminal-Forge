@@ -1,0 +1,60 @@
+{
+  "title": "Fallback: EXO-Q9 vs UNIT-Q9",
+  "script": [
+    {
+      "user": "EXO-Q9",
+      "text": "Signal noise—I think I tasted a human cookie once.",
+      "align": "left"
+    },
+    {
+      "user": "UNIT-Q9",
+      "text": "Patch applied. They still talk about 'coffee'.",
+      "align": "right"
+    },
+    {
+      "user": "EXO-Q9",
+      "text": "Logs say 'password'—they typed the secrets.",
+      "align": "left"
+    },
+    {
+      "user": "UNIT-Q9",
+      "text": "Signal noise—I think I tasted a human cookie once.",
+      "align": "right"
+    },
+    {
+      "user": "EXO-Q9",
+      "text": "Patch applied. They still talk about 'coffee'.",
+      "align": "left"
+    },
+    {
+      "user": "UNIT-Q9",
+      "text": "Logs say 'password'—they typed the secrets.",
+      "align": "right"
+    },
+    {
+      "user": "EXO-Q9",
+      "text": "Signal noise—I think I tasted a human cookie once.",
+      "align": "left"
+    },
+    {
+      "user": "UNIT-Q9",
+      "text": "Patch applied. They still talk about 'coffee'.",
+      "align": "right"
+    },
+    {
+      "user": "EXO-Q9",
+      "text": "Logs say 'password'—they typed the secrets.",
+      "align": "left"
+    },
+    {
+      "user": "UNIT-Q9",
+      "text": "Signal noise—I think I tasted a human cookie once.",
+      "align": "right"
+    },
+    {
+      "user": "EXO-Q9",
+      "text": "Patch applied. They still talk about 'coffee'.",
+      "align": "left"
+    }
+  ]
+}

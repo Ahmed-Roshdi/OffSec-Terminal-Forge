@@ -13,7 +13,6 @@ concurrency:
 
 env:
   CI: true
-  MAPS_PER_RUN: "1"
   SCENARIOS_PER_RUN: "1"
 
 jobs:
@@ -56,11 +55,17 @@ jobs:
           [ "$MISSING" -eq 1 ] && exit 1
           echo "[+] GH_PAT loaded from Dialogue_Generator-AI environment."
 
-      - name: ⚙️ Run generation pipeline
+      - name: 🕐 Set pipeline run timestamp
+        run: echo "PIPELINE_RUN_TS=$(date -u +%Y%m%dT%H%M%SZ)" >> "$GITHUB_ENV"
+
+      - name: 🧠 Generate AI dialogue JSON
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           AI_REQUEST: "Generate a cyberpunk OffSec dialogue between two AI units (7-10 lines)."
-        run: python engines/orchestrator.py
+        run: python engines/ai_engine.py
+
+      - name: 💬 Render dialogue WebP sequences
+        run: python engines/dialogue_generator.py
 
       - name: 🔍 Verify output files were created
         run: |
@@ -72,7 +77,6 @@ jobs:
             echo "[!] output/ is empty — nothing to commit. Aborting."
             exit 1
           fi
-          test -n "$(find output/maps -name '*.webp' -print -quit)" || { echo "[!] No map WebP produced."; exit 1; }
           test -n "$(find output/dialogues -name 'ai_dialogue_raw_*.json' -print -quit)" || { echo "[!] No dialogue JSON produced."; exit 1; }
           test -n "$(find output/dialogues -name 'dialogue_seq_*.webp' -print -quit)" || { echo "[!] No dialogue WebP produced."; exit 1; }
 
@@ -119,7 +123,7 @@ jobs:
               --base main \
               --head auto/generate-assets \
               --title "🤖 Automated: Add generated AI assets" \
-              --body "$(printf '## 🧠 Auto-generated Assets\n\n| Field | Value |\n|---|---|\n| Triggered | workflow_dispatch |\n| Pipeline | orchestrator.py (core → alien → ai → dialogue) |\n| Branch | auto/generate-assets → main |\n| Output | output/ |\n\nAuto-merged by workflow immediately after creation.')" \
+              --body "$(printf '## 🧠 Auto-generated Assets\n\n| Field | Value |\n|---|---|\n| Triggered | workflow_dispatch |\n| Pipeline | ai_engine → dialogue_generator |\n| Branch | auto/generate-assets → main |\n| Output | output/dialogues/ |\n\nAuto-merged by workflow immediately after creation.')" \
               --label automated)
             PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
             echo "[+] Created PR #$PR_NUMBER"

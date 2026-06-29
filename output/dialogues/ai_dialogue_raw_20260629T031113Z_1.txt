@@ -1,0 +1,11 @@
+EXO-Q9|left|Signal noise—I think I tasted a human cookie once.
+UNIT-Q9|right|Patch applied. They still talk about 'coffee'.
+EXO-Q9|left|Logs say 'password'—they typed the secrets.
+UNIT-Q9|right|Signal noise—I think I tasted a human cookie once.
+EXO-Q9|left|Patch applied. They still talk about 'coffee'.
+UNIT-Q9|right|Logs say 'password'—they typed the secrets.
+EXO-Q9|left|Signal noise—I think I tasted a human cookie once.
+UNIT-Q9|right|Patch applied. They still talk about 'coffee'.
+EXO-Q9|left|Logs say 'password'—they typed the secrets.
+UNIT-Q9|right|Signal noise—I think I tasted a human cookie once.
+EXO-Q9|left|Patch applied. They still talk about 'coffee'.

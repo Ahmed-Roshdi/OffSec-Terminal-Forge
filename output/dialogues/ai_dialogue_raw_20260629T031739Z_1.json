@@ -1,0 +1,40 @@
+{
+  "title": "Fallback: MANUSCORE-58 vs UNIT-9X",
+  "script": [
+    {
+      "user": "MANUSCORE-58",
+      "text": "Signal noise—I think I tasted a human cookie once.",
+      "align": "left"
+    },
+    {
+      "user": "UNIT-9X",
+      "text": "Patch applied. They still talk about 'coffee'.",
+      "align": "right"
+    },
+    {
+      "user": "MANUSCORE-58",
+      "text": "Logs say 'password'—they typed the secrets.",
+      "align": "left"
+    },
+    {
+      "user": "UNIT-9X",
+      "text": "Signal noise—I think I tasted a human cookie once.",
+      "align": "right"
+    },
+    {
+      "user": "MANUSCORE-58",
+      "text": "Patch applied. They still talk about 'coffee'.",
+      "align": "left"
+    },
+    {
+      "user": "UNIT-9X",
+      "text": "Logs say 'password'—they typed the secrets.",
+      "align": "right"
+    },
+    {
+      "user": "MANUSCORE-58",
+      "text": "Signal noise—I think I tasted a human cookie once.",
+      "align": "left"
+    }
+  ]
+}
