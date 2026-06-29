@@ -81,30 +81,13 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git fetch origin main
-
-          # Isolate generated output to a safe temp location
-          TMP_OUT="/tmp/output-$$"
-          if [ -d output ]; then
-            echo "[*] Moving output/ -> $TMP_OUT"
-            mv output "$TMP_OUT"
-          fi
-
-          # Create branch from a clean state (origin/main)
-          git checkout -B auto/generate-assets origin/main
-
-          # Restore generated output
-          if [ -d "$TMP_OUT" ]; then
-            echo "[*] Restoring generated output"
-            mv "$TMP_OUT" output
-          fi
-
-          # Force-add files bypassing local .gitignore
+          # 1. إجبار Git على تتبع الملفات ونقلها إلى Staging Area أولاً
           git add -f output/
 
-          echo "[*] Staged files:"
-          git diff --cached --name-only
+          # 2. إنشاء الفرع الجديد من النقطة الحالية (HEAD) لتجنب أي تعارض مع origin/main
+          git checkout -B auto/generate-assets
 
+          # 3. التحقق من وجود تغييرات وحفظها
           if git diff --cached --quiet; then
             echo "[*] No new files — output identical to last run."
             echo "HAS_CHANGES=false" >> "$GITHUB_ENV"
