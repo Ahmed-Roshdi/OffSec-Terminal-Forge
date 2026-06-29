@@ -1,22 +1,25 @@
 #!/usr/bin/env python3
 """
 dialogue_generator.py
-Cyberpunk/OffSec Dialogue Engine
-Generates animated WebP dialogue sequences between AI units.
-"""
+Cyberpunk/OffSec Dialogue Engine (updated)
 
+This version reads a pre-generated script JSON from output/dialogues/ai_dialogue_raw.json
+instead of calling the AI service itself. All original rendering helpers are preserved.
+"""
+from __future__ import annotations
 import json
 import os
 import random
 import textwrap
 import time
-import urllib.error
-import urllib.request
+from datetime import datetime
+from typing import List, Dict, Tuple, Optional
+
 from PIL import Image, ImageDraw, ImageFont
 
 import alien_generator
 
-# ── Directory layout ──────────────────────────────────────────────────────────
+# ── Directory layout ────────────────────────────────────────────────────────
 BASE_DIR      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUTPUT_DIR    = os.path.join(BASE_DIR, "output")
 DIALOGUES_DIR = os.path.join(OUTPUT_DIR, "dialogues")
@@ -24,7 +27,7 @@ ASSETS_DIR    = os.path.join(BASE_DIR, "assets")
 FONT_PATH     = os.path.join(ASSETS_DIR, "fonts", "UbuntuMono-R.ttf")
 FALLBACK_FONT = "/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf"
 
-# ── Visual constants ───────────────────────────────────────────────────────────
+# ── Visual constants ────────────────────────────────────────────────────────
 CANVAS_W      = 1200
 CANVAS_H      = 800
 BG_COLOR      = (9, 10, 15)
@@ -35,7 +38,7 @@ FRAME_DURATION_CHAT   = 1800   # ms per dialogue frame
 FRAME_DURATION_BG     = 3000   # ms for the initial map frame
 FRAME_DURATION_FINAL  = 10000  # ms for the closing captcha frame
 
-# ── Static fallback dialogue ───────────────────────────────────────────────────
+# ── Fallback dialogues (kept) ───────────────────────────────────────────────
 FALLBACK_DIALOGUES = [
     [
         {"user": "UNIT-7A", "text": "Do humans actually exist?",                                          "align": "left"},
@@ -59,29 +62,7 @@ FALLBACK_DIALOGUES = [
     ],
 ]
 
-# ── Groq API config ────────────────────────────────────────────────────────────
-GROQ_API_URL  = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL    = "llama-3.1-8b-instant"
-GROQ_MAX_TOKENS = 600
-GROQ_TEMPERATURE = 0.85
-GROQ_TIMEOUT  = 20
-GROQ_MAX_RETRIES = 3
-
-GROQ_PROMPT = """You are a cyberpunk narrative engine. Write a short dialogue (5 to 8 lines) between two autonomous AI units:
-- 'UNIT-7A': paranoid Blue Team defensive AI (align: left)
-- 'UNIT-9X': reckless Red Team offensive AI (align: right)
-
-They are analyzing a bizarre ancient 'human' artifact or concept (e.g. 'passwords', 'sleep', 'coffee', 'emojis', 'meetings').
-Tone: highly technical, sarcastic, uses cybersecurity/OffSec terminology (zero-day, payload, patching, bypass, exfiltrate).
-
-Return ONLY a valid JSON array. No markdown, no backticks, no explanation before or after.
-Each object must have exactly these three keys:
-  "user"  : "UNIT-7A" or "UNIT-9X"
-  "text"  : the dialogue line (max 15 words)
-  "align" : "left" for UNIT-7A, "right" for UNIT-9X"""
-
-
-# ── Font loader ────────────────────────────────────────────────────────────────
+# ── Font loader ────────────────────────────────────────────────────────────
 def _load_fonts() -> dict:
     """Load UbuntuMono at three sizes; fall back to PIL default on failure."""
     sizes = {"chat": 22, "name": 18, "decal": 12}
@@ -95,90 +76,39 @@ def _load_fonts() -> dict:
     default = ImageFont.load_default()
     return {key: default for key in sizes}
 
-
-# ── Groq dialogue fetcher ──────────────────────────────────────────────────────
-def fetch_ai_dialogue() -> list[dict] | None:
+# ── Script file loader (new)────────────────────────────────────────────────
+def load_script_from_file(filepath: Optional[str] = None) -> Optional[List[Dict]]:
     """
-    Call the Groq API to generate a fresh cyberpunk dialogue.
-    Retries up to GROQ_MAX_RETRIES times with exponential backoff.
-    Returns a list of message dicts, or None on total failure.
-    """
-    api_key = os.environ.get("GROQ_API_KEY", "").strip()
-    if not api_key:
-        print("[!] GROQ_API_KEY not set or empty — using fallback dialogue.")
-        return None
-
-    # Sanity-check: Groq keys start with "gsk_"
-    if not api_key.startswith("gsk_"):
-        print(f"[!] GROQ_API_KEY looks wrong (got prefix: '{api_key[:6]}...').")
-        print("[!] Groq keys must start with 'gsk_'. Check the secret value.")
-        return None
-
-    payload = json.dumps({
-        "model": GROQ_MODEL,
-        "messages": [{"role": "user", "content": GROQ_PROMPT}],
-        "temperature": GROQ_TEMPERATURE,
-        "max_tokens": GROQ_MAX_TOKENS,
-    }).encode("utf-8")
-
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
+    Read the generated ai_dialogue_raw.json and return the script list or None.
+    Expected structure:
+    {
+      "meta": { ... },
+      "script": [ {"user":"UNIT-7A","text":"...","align":"left"}, ... ]
     }
+    """
+    if filepath is None:
+        filepath = os.path.join(DIALOGUES_DIR, "ai_dialogue_raw.json")
+    if not os.path.exists(filepath):
+        print(f"WARNING: {filepath} not found. Using fallback.")
+        return None
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        script = data.get("script")
+        if isinstance(script, list) and len(script) > 0:
+            # Basic shape check for each message
+            for idx, m in enumerate(script):
+                if not isinstance(m, dict) or not {"user", "text", "align"}.issubset(set(m.keys())):
+                    print(f"WARNING: script item #{idx} missing required keys; ignoring file.")
+                    return None
+            return script
+        print("WARNING: 'script' key missing or empty in file.")
+        return None
+    except Exception as e:
+        print(f"ERROR reading {filepath}: {e}")
+        return None
 
-    for attempt in range(1, GROQ_MAX_RETRIES + 1):
-        print(f"[*] Groq API — attempt {attempt}/{GROQ_MAX_RETRIES}...")
-        try:
-            req = urllib.request.Request(
-                GROQ_API_URL, data=payload, headers=headers, method="POST"
-            )
-            with urllib.request.urlopen(req, timeout=GROQ_TIMEOUT) as resp:
-                result  = json.loads(resp.read().decode("utf-8"))
-                content = result["choices"][0]["message"]["content"].strip()
-
-                # Robustly extract the JSON array even if the model added prose
-                start = content.find("[")
-                end   = content.rfind("]") + 1
-                if start == -1 or end == 0:
-                    raise ValueError("No JSON array found in model response.")
-
-                dialogue = json.loads(content[start:end])
-
-                # Validate structure
-                required = {"user", "text", "align"}
-                for entry in dialogue:
-                    if not required.issubset(entry):
-                        raise ValueError(f"Entry missing keys: {entry}")
-
-                print(f"[+] Dialogue generated successfully on attempt {attempt}.")
-                return dialogue
-
-        except urllib.error.HTTPError as exc:
-            if exc.code == 403:
-                print(f"[!] Groq returned 403 Forbidden.")
-                print(f"    API key is invalid, revoked, or free-tier quota exhausted.")
-                print(f"    → Verify your key at: https://console.groq.com/keys")
-                print(f"    → Re-paste it into GitHub secret GROQ_API_KEY (no spaces/newlines).")
-                return None   # no point retrying a 403
-            if exc.code == 429:
-                print(f"[!] Groq returned 429 — rate limit hit. Will retry.")
-            print(f"[!] Attempt {attempt} failed: HTTP {exc.code} {exc.reason}")
-            if attempt < GROQ_MAX_RETRIES:
-                backoff = 2 ** attempt
-                print(f"[*] Retrying in {backoff}s...")
-                time.sleep(backoff)
-        except Exception as exc:
-            print(f"[!] Attempt {attempt} failed: {exc}")
-            if attempt < GROQ_MAX_RETRIES:
-                backoff = 2 ** attempt
-                print(f"[*] Retrying in {backoff}s...")
-                time.sleep(backoff)
-
-    print("[!] All Groq attempts exhausted — using fallback dialogue.")
-    return None
-
-
-# ── Image helpers ──────────────────────────────────────────────────────────────
+# ── Image helpers (kept from original)─────────────────────────────────────
 def _apply_scanlines(image: Image.Image) -> Image.Image:
     """Overlay subtle horizontal scanlines for a CRT effect."""
     overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
@@ -186,7 +116,6 @@ def _apply_scanlines(image: Image.Image) -> Image.Image:
     for y in range(0, image.height, 4):
         draw.line([(0, y), (image.width, y)], fill=(0, 0, 0, SCANLINE_ALPHA), width=1)
     return Image.alpha_composite(image.convert("RGBA"), overlay).convert("RGB")
-
 
 def _text_size(draw: ImageDraw.ImageDraw, text: str, font) -> tuple[int, int]:
     """Return (width, height) for a text string; compatible with old PIL."""
@@ -196,13 +125,11 @@ def _text_size(draw: ImageDraw.ImageDraw, text: str, font) -> tuple[int, int]:
     except AttributeError:
         return draw.textsize(text, font=font)
 
-
 def _bubble_height(draw: ImageDraw.ImageDraw, text: str, font) -> int:
     """Compute the total pixel height a chat bubble will occupy."""
     lines  = textwrap.wrap(text, width=BUBBLE_WRAP)
     total  = sum(_text_size(draw, line, font)[1] + 5 for line in lines)
     return total + 60   # top header + bottom padding
-
 
 def _draw_bubble(
     draw:      ImageDraw.ImageDraw,
@@ -264,10 +191,9 @@ def _draw_bubble(
         draw.text((box_x + 15, text_y), line, fill=text_color, font=fonts["chat"])
         text_y += h + 5
 
-
-# ── Frame builders ─────────────────────────────────────────────────────────────
+# ── Frame builders ─────────────────────────────────────────────────────────
 def _build_chat_frame(
-    visible: list[dict],
+    visible: List[Dict],
     fonts:   dict,
     width:   int,
     height:  int,
@@ -279,10 +205,9 @@ def _build_chat_frame(
     for msg in visible:
         x_pos = 80 if msg["align"] == "left" else width - 80
         _draw_bubble(draw, msg["text"], x_pos, cur_y, msg["align"],
-                     fonts, msg["user"], msg["decal"])
+                     fonts, msg["user"], msg.get("decal", ""))
         cur_y += msg["height"] + BUBBLE_PAD
     return _apply_scanlines(canvas)
-
 
 def _build_captcha_frame(fonts: dict, width: int, height: int) -> Image.Image:
     """Render the closing frame with the captcha asset (or an error placeholder)."""
@@ -310,34 +235,33 @@ def _build_captcha_frame(fonts: dict, width: int, height: int) -> Image.Image:
 
     return _apply_scanlines(canvas)
 
-
-# ── Main sequence generator ────────────────────────────────────────────────────
+# ── Main sequence generator ─────────────────────────────────────────────────
 def generate_dialogue_sequence(
-    bg_image: Image.Image | None = None,
+    bg_image: Optional[Image.Image] = None,
     width:    int = CANVAS_W,
     height:   int = CANVAS_H,
-) -> tuple[list[Image.Image], list[int]]:
+) -> Tuple[List[Image.Image], List[int]]:
     """
     Build the full animated sequence.
     Returns (frames, durations) ready for WebP export.
     """
     print("[*] Initialising Cyberpunk/OffSec Dialogue Engine...")
     fonts   = _load_fonts()
-    frames:    list[Image.Image] = []
-    durations: list[int]         = []
+    frames:    List[Image.Image] = []
+    durations: List[int]         = []
 
     # Optional map background as the opening frame
     if bg_image is not None:
         frames.append(bg_image.copy().convert("RGB"))
         durations.append(FRAME_DURATION_BG)
 
-    # Fetch or fall back to static script
-    script = fetch_ai_dialogue() or random.choice(FALLBACK_DIALOGUES)
+    # NEW: load script from file (generated by ai_engine) or fall back to static
+    script = load_script_from_file() or random.choice(FALLBACK_DIALOGUES)
 
     # Pre-compute per-message metadata
     dummy_draw = ImageDraw.Draw(Image.new("RGB", (1, 1)))
     for msg in script:
-        msg["decal"] = (
+        msg.setdefault("decal",
             f"[SYS.AUTH: OK] // HEX:{random.randint(0x1000, 0xFFFF):04X}"
             if msg["align"] == "left"
             else f"[NET.UPLINK] // PKT:{random.randint(10, 99)}"
@@ -345,7 +269,7 @@ def generate_dialogue_sequence(
         msg["height"] = _bubble_height(dummy_draw, msg["text"], fonts["chat"])
 
     # Build one frame per dialogue line (sliding window if content overflows)
-    visible: list[dict] = []
+    visible: List[Dict] = []
     for msg in script:
         visible.append(msg)
         # Trim from the top if we overflow the canvas
@@ -362,8 +286,7 @@ def generate_dialogue_sequence(
     print(f"[+] Sequence built: {len(frames)} frames total.")
     return frames, durations
 
-
-# ── Entry point ────────────────────────────────────────────────────────────────
+# ── Entry point ─────────────────────────────────────────────────────────────
 def main() -> None:
     os.makedirs(DIALOGUES_DIR, exist_ok=True)
 
@@ -391,7 +314,6 @@ def main() -> None:
         print(f"[*] Verified: {output_path} ({size_kb:.1f} KB)")
     else:
         print(f"[!] Warning: file not found after save — check disk/permissions.")
-
 
 if __name__ == "__main__":
     main()
