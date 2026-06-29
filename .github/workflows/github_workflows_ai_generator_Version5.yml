@@ -89,15 +89,18 @@ jobs:
             echo "[*] No output/ directory to stash"
           fi
 
+          # Fetch remote main and checkout a clean branch from it
           git fetch origin main
           git checkout -B auto/generate-assets origin/main
 
+          # Restore stashed generated output (if any)
           if [ -d "$TMPDIR/output" ]; then
             echo "[*] Restoring stashed output/"
             mv "$TMPDIR/output" ./ || true
           fi
           rm -rf "$TMPDIR" || true
 
+          # Force-add output/ even if in .gitignore
           git add -f output/ || true
 
           echo "[*] Staged files:"
