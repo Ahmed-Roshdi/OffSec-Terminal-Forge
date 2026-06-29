@@ -1,1 +1,0 @@
-[![🧠 Workflow-Output (AI Generator)](https://github.com/Ahmed-Roshdi/OffSec-Terminal-Forge/actions/workflows/github_workflows_ai_generator_Version5.yml/badge.svg?event=release)](https://github.com/Ahmed-Roshdi/OffSec-Terminal-Forge/actions/workflows/github_workflows_ai_generator_Version5.yml)
