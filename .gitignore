@@ -1,3 +1,5 @@
 # output/ tracked on remote, ignored locally
 !output/
 output/**/.DS_Store
+__pycache__/
+*.pyc
