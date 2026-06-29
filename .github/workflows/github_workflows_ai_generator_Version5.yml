@@ -36,7 +36,7 @@ jobs:
       - name: 📦 Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install Pillow
+          pip install Pillow requests
 
       # ── 4. Secrets check ───────────────────────────────────────────────────
       - name: ✅ Verify secrets are present
@@ -54,9 +54,13 @@ jobs:
       - name: 🌍 Generate alien map
         run: python engines/alien_generator.py
 
-      - name: 💬 Generate AI dialogue
+      - name: 🧠 Generate AI dialogue JSON (ai_engine)
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          python engines/ai_engine.py --request "Generate a cyberpunk security dialogue for Manus (5-8 lines)."
+
+      - name: 💬 Render AI dialogue into WebP (dialogue_generator)
         run: python engines/dialogue_generator.py
 
       # ── 6. Verify output ───────────────────────────────────────────────────
@@ -102,10 +106,19 @@ jobs:
             echo "HAS_CHANGES=true" >> "$GITHUB_ENV"
           fi
 
-      # ── 8. Open PR via gh CLI ──────────────────────────────────────────────
+      # ── 8. Authenticate gh CLI (ensure GH token available for subsequent gh commands)
+      - name: 🔐 Authenticate gh CLI
+        if: env.HAS_CHANGES == 'true'
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          # Use GH PAT to authenticate gh CLI non-interactively
+          echo "$GH_PAT" | gh auth login --with-token
+          gh --version
+
+      # ── 9. Open PR via gh CLI ──────────────────────────────────────────────
       #
       #  Using gh CLI directly instead of peter-evans/create-pull-request.
-      #  The action did its own git operations that reset our branch to main HEAD.
       #
       - name: 📬 Create Pull Request → main
         if: env.HAS_CHANGES == 'true'
@@ -128,14 +141,19 @@ jobs:
               --base main \
               --head auto/generate-assets \
               --title "🤖 Automated: Add generated AI assets" \
-              --body "$(printf '## 🧠 Auto-generated Assets\n\n| Field | Value |\n|---|---|\n| Triggered | workflow_dispatch |\n| Branch | auto/generate-assets → main |\n| Output | output/ |\n\nAuto-merged by workflow immediately after creation.')" \
+              --body "$(printf '## 🧠 Auto-generated Assets\n\n| Field | Value |\n|---|---|\n| Triggered | workflow_dispatch |\n| Branch | auto/generate-assets → main |\n| Output | output/ |\n\nAutomated generation of alien maps and dialogue sequences.')" \
               --label automated)
-            PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
-            echo "[+] Created PR #$PR_NUMBER"
-            echo "PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
+            PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$' || true)
+            if [ -n "$PR_NUMBER" ]; then
+              echo "[+] Created PR #$PR_NUMBER"
+              echo "PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
+            else
+              echo "[!] Failed to parse PR number from URL: $PR_URL"
+              echo "PR_NUMBER=" >> "$GITHUB_ENV"
+            fi
           fi
 
-      # ── 9. Auto-merge with retry ───────────────────────────────────────────
+      # ── 10. Auto-merge with retry ───────────────────────────────────────────
       - name: 🔄 Auto-merge PR into main
         if: env.HAS_CHANGES == 'true' && env.PR_NUMBER != ''
         env:
@@ -161,7 +179,7 @@ jobs:
           echo "[!] All $MAX merge attempts failed."
           exit 1
 
-      # ── 10. Confirm ────────────────────────────────────────────────────────
+      # ── 11. Confirm ────────────────────────────────────────────────────────
       - name: ✅ Confirm main received the changes
         if: env.HAS_CHANGES == 'true'
         run: |
