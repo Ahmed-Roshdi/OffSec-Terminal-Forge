@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 """
 engines/ai_engine.py
-Generates N dialogue scenarios per run (JSON + plain .txt) for dialogue_generator.py.
+AI Persona Engine — generates dialogue scenarios via Groq and writes each one
+as a standalone script file to output/scripts/.
 
-Output files written to output/dialogues/:
-  ai_dialogue_raw_{timestamp}_{i}.json
-  ai_dialogue_raw_{timestamp}_{i}.txt
+Architecture (script / render decoupling):
+  ai_engine.py  (this file)  →  writes  output/scripts/script_{ts}_{i}_{uuid}.json
+  dialogue_generator.py      →  reads   output/scripts/script_*.json
+                              →  writes output/dialogues/dialogue_seq_{name}.webp
 
-Pipeline integration:
-  - orchestrator.py sets PIPELINE_RUN_TS before calling this module.
-  - Both this module and dialogue_generator.py share PIPELINE_RUN_TS to
-    ensure dialogue_generator only renders the JSONs created in THIS run.
+This module ONLY produces script data. It never touches output/dialogues/.
+That separation is intentional — it lets the render engine fail, retry, or be
+re-run independently without re-calling the Groq API.
 """
 from __future__ import annotations
 
@@ -18,27 +19,28 @@ import json
 import os
 import random
 import time
+import uuid
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 import requests
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
-BASE_DIR   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUTPUT_DIR = os.path.join(BASE_DIR, "output", "dialogues")
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPTS_DIR = os.path.join(BASE_DIR, "output", "scripts")
+os.makedirs(SCRIPTS_DIR, exist_ok=True)
 
 # ── Groq config ────────────────────────────────────────────────────────────────
-GROQ_API_URL  = "https://api.groq.com/openai/v1/chat/completions"
-MODEL_NAME    = "llama-3.3-70b-versatile"
-TEMPERATURE   = 0.85
-MAX_RETRIES   = 3
-TIMEOUT       = 30
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+MODEL_NAME   = "llama-3.3-70b-versatile"
+TEMPERATURE  = 0.85
+MAX_RETRIES  = 3
+TIMEOUT      = 30
 
 # ── Run config ─────────────────────────────────────────────────────────────────
-SCENARIOS_PER_RUN = int(os.getenv("SCENARIOS_PER_RUN", "3"))
-LINES_MIN         = 7
-LINES_MAX         = 12
+SCENARIOS_PER_RUN = int(os.getenv("SCENARIOS_PER_RUN", "1"))
+LINES_MIN = 7
+LINES_MAX = 12
 
 # ── Robot name generator ───────────────────────────────────────────────────────
 _PREFIXES = ["UNIT", "NODE", "EXO", "SYN", "AXI", "ZETA", "NOVA", "HEX"]
@@ -99,12 +101,10 @@ def _local_fallback(names: List[str], num_lines: int) -> List[Dict]:
 # ── JSON extractor (robust against markdown wrapping) ─────────────────────────
 def _extract_json(text: str) -> Dict:
     text = text.strip()
-    # Try direct parse first
     try:
         return json.loads(text)
     except json.JSONDecodeError:
         pass
-    # Find first complete JSON object
     start = text.find("{")
     end   = text.rfind("}") + 1
     if start != -1 and end > start:
@@ -114,52 +114,42 @@ def _extract_json(text: str) -> Dict:
             pass
     raise ValueError("No valid JSON object found in model response.")
 
-# ── API key validation ─────────────────────────────────────────────────────────
-def _validate_key(api_key: str) -> bool:
-    """Basic sanity checks before hitting the API."""
+# ── Key sanity check (diagnostic only — does not block, just skips Groq) ──────
+def _looks_like_valid_key(api_key: str) -> bool:
     if not api_key:
-        print("[!] GROQ_API_KEY is empty.")
         return False
     if not api_key.startswith("gsk_"):
-        print(f"[!] GROQ_API_KEY wrong format — got prefix '{api_key[:8]}...', expected 'gsk_'.")
-        print("    → Regenerate at https://console.groq.com/keys")
+        print(f"[ai_engine] GROQ_API_KEY format looks wrong (prefix '{api_key[:8]}...').")
         return False
     if len(api_key) < 40:
-        print(f"[!] GROQ_API_KEY suspiciously short ({len(api_key)} chars). Likely truncated.")
+        print(f"[ai_engine] GROQ_API_KEY suspiciously short ({len(api_key)} chars).")
         return False
     return True
 
 # ── Groq API caller ────────────────────────────────────────────────────────────
 def _call_groq(prompt: str, api_key: str) -> Optional[str]:
     payload = {
-        "model":    MODEL_NAME,
+        "model": MODEL_NAME,
         "messages": [{"role": "system", "content": prompt}],
         "temperature": TEMPERATURE,
     }
     headers = {"Authorization": f"Bearer {api_key}"}
 
     for attempt in range(1, MAX_RETRIES + 1):
-        print(f"[Groq] Attempt {attempt}/{MAX_RETRIES}...")
+        print(f"[ai_engine][Groq] Attempt {attempt}/{MAX_RETRIES}...")
         try:
-            resp = requests.post(
-                GROQ_API_URL, json=payload, headers=headers, timeout=TIMEOUT
-            )
+            resp = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=TIMEOUT)
             resp.raise_for_status()
             content = resp.json()["choices"][0]["message"]["content"]
-            print(f"[Groq] Got response ({len(content)} chars).")
+            print(f"[ai_engine][Groq] Got response ({len(content)} chars).")
             return content
 
         except requests.exceptions.HTTPError as exc:
             code = exc.response.status_code if exc.response is not None else "?"
-            print(f"[Groq] HTTP {code}: {exc}")
-            if code == 401:
-                print("    → Key is INVALID. Regenerate at https://console.groq.com/keys")
-                return None   # no point retrying auth failure
-            if code == 403:
-                print("    → Key REVOKED or quota EXCEEDED.")
-                print("    → Check status: https://console.groq.com/keys")
-                print("    → Free tier: 500K tokens/day, 14.4K tokens/min")
-                return None   # no point retrying a 403
+            print(f"[ai_engine][Groq] HTTP {code}: {exc}")
+            if code in (401, 403):
+                print("    → Auth failure. Not retrying — check GROQ_API_KEY.")
+                return None
             if code == 429:
                 backoff = 2 ** attempt
                 print(f"    → Rate limited. Backing off {backoff}s...")
@@ -168,35 +158,31 @@ def _call_groq(prompt: str, api_key: str) -> Optional[str]:
                 time.sleep(2 ** attempt)
 
         except requests.exceptions.Timeout:
-            print(f"[Groq] Timeout after {TIMEOUT}s.")
+            print(f"[ai_engine][Groq] Timeout after {TIMEOUT}s.")
             time.sleep(2 ** attempt)
 
         except Exception as exc:
-            print(f"[Groq] Unexpected error: {exc}")
+            print(f"[ai_engine][Groq] Unexpected error: {exc}")
             time.sleep(2 ** attempt)
 
-    print("[Groq] All attempts exhausted.")
+    print("[ai_engine][Groq] All attempts exhausted.")
     return None
 
-# ── File writers ───────────────────────────────────────────────────────────────
-def _save_json(obj: Dict, path: str) -> None:
+# ── File writer ─────────────────────────────────────────────────────────────────
+def _save_script(obj: Dict, path: str) -> None:
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False, indent=2)
-
-def _save_txt(script: List[Dict], path: str) -> None:
-    """Plain text: one line per message in 'NAME|align|text' format."""
-    with open(path, "w", encoding="utf-8") as f:
-        for msg in script:
-            f.write(f"{msg['user']}|{msg.get('align', 'left')}|{msg['text']}\n")
 
 # ── Main generator ─────────────────────────────────────────────────────────────
 def generate_scenarios(request_context: str = "") -> List[str]:
     """
-    Generate SCENARIOS_PER_RUN dialogue scenarios.
-    Returns list of created JSON file paths.
+    Generate SCENARIOS_PER_RUN dialogue scripts.
+    Each script is written as its OWN file to output/scripts/ with a
+    timestamp + index + short UUID filename — unique, sortable, and
+    traceable back to the run that created it.
+
+    Returns the list of created file paths.
     """
-    # PIPELINE_RUN_TS is set by orchestrator.py before this function is called.
-    # If running standalone, set it here so dialogue_generator can match files.
     ts = os.getenv("PIPELINE_RUN_TS", "").strip()
     if not ts:
         ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -204,7 +190,7 @@ def generate_scenarios(request_context: str = "") -> List[str]:
         print(f"[ai_engine] Standalone run — PIPELINE_RUN_TS={ts}")
 
     api_key = os.getenv("GROQ_API_KEY", "").strip()
-    groq_available = _validate_key(api_key)
+    groq_available = _looks_like_valid_key(api_key)
     if not groq_available:
         print("[ai_engine] Groq unavailable — local fallback scripts will be used.")
 
@@ -238,26 +224,25 @@ def generate_scenarios(request_context: str = "") -> List[str]:
             content   = {"title": f"Fallback: {robots[0]} vs {robots[1]}", "script": script}
             print(f"[ai_engine] Using local fallback ({num_lines} lines).")
 
-        base      = f"ai_dialogue_raw_{ts}_{i}"
-        json_path = os.path.join(OUTPUT_DIR, base + ".json")
-        txt_path  = os.path.join(OUTPUT_DIR, base + ".txt")
+        short_uuid = uuid.uuid4().hex[:8]
+        filename   = f"script_{ts}_{i:02d}_{short_uuid}.json"
+        filepath   = os.path.join(SCRIPTS_DIR, filename)
 
-        _save_json(content, json_path)
-        _save_txt(content["script"], txt_path)
-        print(f"[ai_engine] Saved: {json_path}")
-        created_files.append(json_path)
+        _save_script(content, filepath)
+        print(f"[ai_engine] Saved: {filepath}")
+        created_files.append(filepath)
 
     return created_files
 
 
 def main() -> None:
     import argparse
-    parser = argparse.ArgumentParser(description="Generate AI dialogue scenarios (JSON + TXT)")
+    parser = argparse.ArgumentParser(description="Generate AI dialogue scripts → output/scripts/")
     parser.add_argument("--request", "-r", default="", help="Optional theme/context")
     args = parser.parse_args()
 
     files = generate_scenarios(request_context=args.request)
-    print(f"\n[ai_engine] Done. {len(files)} scenario file(s) created.")
+    print(f"\n[ai_engine] Done. {len(files)} script file(s) created in output/scripts/.")
 
 
 if __name__ == "__main__":

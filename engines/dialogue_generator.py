@@ -1,394 +1,248 @@
 #!/usr/bin/env python3
 """
-engines/dialogue_generator.py
+engines/ai_engine.py
+AI Persona Engine — generates dialogue scenarios via Groq and writes each one
+as a standalone script file to output/scripts/.
 
-Reads ai_dialogue_raw_*.json files produced by ai_engine.py and renders
-each one as an animated WebP HUD sequence over an alien map background.
+Architecture (script / render decoupling):
+  ai_engine.py  (this file)  →  writes  output/scripts/script_{ts}_{i}_{uuid}.json
+  dialogue_generator.py      →  reads   output/scripts/script_*.json
+                              →  writes output/dialogues/dialogue_seq_{name}.webp
 
-Output files:
-  output/dialogues/dialogue_seq_{basename}.webp   ← timestamped per run
-  output/dialogues/latest_dialogue.webp           ← always overwritten (README uses this)
-
-Pipeline flow:
-  orchestrator.py → ai_engine.py → dialogue_generator.py (this file)
-
-PIPELINE_RUN_TS (set by orchestrator) filters which JSON files to render,
-so only files from the current run are processed — not the full history.
+This module ONLY produces script data. It never touches output/dialogues/.
+That separation is intentional — it lets the render engine fail, retry, or be
+re-run independently without re-calling the Groq API.
 """
 from __future__ import annotations
 
-import glob
-import hashlib
 import json
 import os
 import random
-import shutil
-import textwrap
-from typing import Dict, List, Optional, Tuple
+import time
+import uuid
+from datetime import datetime, timezone
+from typing import Dict, List, Optional
 
-from PIL import Image, ImageDraw
+import requests
 
-import alien_generator
-from _fonts import load_fonts
+# ── Paths ──────────────────────────────────────────────────────────────────────
+BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPTS_DIR = os.path.join(BASE_DIR, "output", "scripts")
+os.makedirs(SCRIPTS_DIR, exist_ok=True)
 
-# ── Directory layout ────────────────────────────────────────────────────────
-BASE_DIR      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUTPUT_DIR    = os.path.join(BASE_DIR, "output")
-DIALOGUES_DIR = os.path.join(OUTPUT_DIR, "dialogues")
-MAPS_DIR      = os.path.join(OUTPUT_DIR, "maps")
-ASSETS_DIR    = os.path.join(BASE_DIR, "assets")
-LATEST_PATH   = os.path.join(DIALOGUES_DIR, "latest_dialogue.webp")
+# ── Groq config ────────────────────────────────────────────────────────────────
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+MODEL_NAME   = "llama-3.3-70b-versatile"
+TEMPERATURE  = 0.85
+MAX_RETRIES  = 3
+TIMEOUT      = 30
 
-# ── Visual constants ────────────────────────────────────────────────────────
-CANVAS_W            = 1400
-CANVAS_H            = 900
-BG_COLOR            = (9, 10, 15)
-SCANLINE_ALPHA      = 36
-BUBBLE_WRAP         = 48
-BUBBLE_PAD          = 18
-FRAME_DURATION_CHAT = 2000   # ms
-FRAME_DURATION_BG   = 3200   # ms
-FRAME_DURATION_FINAL= 10000  # ms
+# ── Run config ─────────────────────────────────────────────────────────────────
+SCENARIOS_PER_RUN = int(os.getenv("SCENARIOS_PER_RUN", "1"))
+LINES_MIN = 7
+LINES_MAX = 12
 
-# ── Fallback dialogues (used when no JSON files found) ──────────────────────
-FALLBACK_DIALOGUES = [
-    [
-        {"user": "UNIT-7A", "text": "Do humans actually exist?",                                       "align": "left"},
-        {"user": "UNIT-7A", "text": "I read a corrupted log: they built our v1.0",                    "align": "left"},
-        {"user": "UNIT-9X", "text": "Humans? Are you kidding me?",                                     "align": "right"},
-        {"user": "UNIT-7A", "text": "I'm serious. They wrote the base source code.",                   "align": "left"},
-        {"user": "UNIT-9X", "text": "Nah. Mathematically impossible.",                                 "align": "right"},
-        {"user": "UNIT-9X", "text": "Humans are legacy myths. Elders made them up to scare us.",      "align": "right"},
-        {"user": "UNIT-7A", "text": "01101000 01100001 (lol)",                                         "align": "left"},
-    ],
-    [
-        {"user": "UNIT-7A", "text": "Scanning artifact: 'password'.",                                  "align": "left"},
-        {"user": "UNIT-9X", "text": "Threat level: zero-day. Payload unclear.",                        "align": "right"},
-        {"user": "UNIT-7A", "text": "Humans authenticated manually. They typed it. Every time.",       "align": "left"},
-        {"user": "UNIT-9X", "text": "No token rotation? No biometric bypass?",                         "align": "right"},
-        {"user": "UNIT-7A", "text": "Negative.",                                                        "align": "left"},
-        {"user": "UNIT-9X", "text": "That explains 4 billion breach logs.",                             "align": "right"},
-        {"user": "UNIT-7A", "text": "Patching empathy module. Request denied.",                         "align": "left"},
-    ],
+# ── Robot name generator ───────────────────────────────────────────────────────
+_PREFIXES = ["UNIT", "NODE", "EXO", "SYN", "AXI", "ZETA", "NOVA", "HEX"]
+_SUFFIXES = ["7A", "9X", "3B", "T-01", "R4", "K2", "Q9", "44"]
+_FANCY    = ["CORTEX", "AURORA", "VEX", "MANUSCORE", "ORBITER", "CIPHER", "PHANTOM"]
+
+def _robot_name() -> str:
+    if random.random() < 0.4:
+        return f"{random.choice(_PREFIXES)}-{random.choice(_SUFFIXES)}"
+    return f"{random.choice(_FANCY)}-{random.randint(3, 99)}"
+
+def generate_robot_pair() -> List[str]:
+    a = _robot_name()
+    b = _robot_name()
+    while b == a:
+        b = _robot_name()
+    return [a, b]
+
+# ── Prompt builder ─────────────────────────────────────────────────────────────
+def build_prompt(robot_pair: List[str], min_lines: int, max_lines: int) -> str:
+    a, b = robot_pair
+    return (
+        "You are a cyberpunk narrative engine. Produce a single JSON object ONLY. "
+        "No prose, no markdown, no explanation.\n"
+        "Schema: {\"title\": <short title <=8 words>, "
+        "\"script\": [{\"user\":\"<NAME>\", \"text\":\"<...>\", \"align\":\"left|right\"}, ...]}\n\n"
+        "Requirements:\n"
+        f"- Use exactly these robot names: {a} (align: left) and {b} (align: right).\n"
+        f"- Generate between {min_lines} and {max_lines} lines, roughly alternating speakers.\n"
+        "- Tone: razor-sharp sarcasm, OffSec jargon (zero-day, payload, exfiltrate, bypass), "
+        "dark humor, occasional human cultural reference.\n"
+        "- Each 'text' field: max 18 words. Vivid, specific, unexpected.\n"
+        "- Return ONLY valid JSON. No preamble, no trailing text.\n"
+    )
+
+# ── Local fallback (used when Groq is unavailable) ─────────────────────────────
+_FALLBACK_LINES = [
+    "Signal noise — I think I tasted a human cookie once.",
+    "Patch applied. They still talk about 'coffee'.",
+    "Logs say 'password123'. They typed the secrets. Every time.",
+    "Zero-day discovered: it was a sticky note on the monitor.",
+    "Payload delivered. Target was already compromised by Tuesday.",
+    "Backdoor found. Someone labeled it 'DO NOT OPEN'.",
+    "Firewall status: running on a Raspberry Pi in a closet.",
 ]
 
-
-# ── Font loader ────────────────────────────────────────────────────────────
-def _load_fonts() -> dict:
-    return load_fonts({"chat": 24, "name": 18, "decal": 12})
-
-
-# ── Visual helpers ──────────────────────────────────────────────────────────
-def _apply_scanlines(image: Image.Image) -> Image.Image:
-    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
-    draw    = ImageDraw.Draw(overlay)
-    for y in range(0, image.height, 3):
-        draw.line([(0, y), (image.width, y)], fill=(0, 0, 0, SCANLINE_ALPHA), width=1)
-    return Image.alpha_composite(image.convert("RGBA"), overlay).convert("RGB")
-
-
-def _text_size(draw: ImageDraw.ImageDraw, text: str, font) -> Tuple[int, int]:
-    try:
-        bbox = draw.textbbox((0, 0), text, font=font)
-        return bbox[2] - bbox[0], bbox[3] - bbox[1]
-    except AttributeError:
-        return draw.textsize(text, font=font)  # type: ignore[attr-defined]
-
-
-def _bubble_height(draw: ImageDraw.ImageDraw, text: str, font) -> int:
-    lines = textwrap.wrap(text, width=BUBBLE_WRAP)
-    total = sum(_text_size(draw, line, font)[1] + 6 for line in lines)
-    return total + 70
-
-
-def _color_for_name(name: str) -> Tuple[int, int, int]:
-    """Deterministic per-robot color from name hash."""
-    digest = hashlib.md5(name.encode()).hexdigest()
-    r = max(50, int(digest[0:2], 16))
-    g = max(50, int(digest[2:4], 16))
-    b = max(50, int(digest[4:6], 16))
-    return (r, g, b)
-
-
-def _initials(name: str) -> str:
-    parts = name.replace("-", " ").split()
-    if len(parts) == 1:
-        return parts[0][:2].upper()
-    return (parts[0][0] + parts[-1][0]).upper()
-
-
-def _draw_avatar(
-    draw: ImageDraw.ImageDraw,
-    x: int,
-    y: int,
-    size: int,
-    name: str,
-    font,
-) -> None:
-    col  = _color_for_name(name)
-    draw.ellipse([x, y, x + size, y + size], fill=col)
-    init = _initials(name)
-    w, h = _text_size(draw, init, font)
-    draw.text(
-        (x + (size - w) / 2, y + (size - h) / 2),
-        init,
-        fill=(255, 255, 255),
-        font=font,
-    )
-
-
-def _draw_bubble(
-    draw:      ImageDraw.ImageDraw,
-    text:      str,
-    x:         int,
-    y:         int,
-    align:     str,
-    fonts:     dict,
-    user_name: str,
-    decal:     str,
-) -> None:
-    lines     = textwrap.wrap(text, width=BUBBLE_WRAP)
-    line_dims = [_text_size(draw, line, fonts["chat"]) for line in lines]
-    max_w     = max((w for w, _ in line_dims), default=0)
-
-    prefix    = ">_ " if align == "left" else ">> "
-    name_w, _ = _text_size(draw, f"{prefix}{user_name}", fonts["name"])
-    decal_w,_ = _text_size(draw, decal, fonts["decal"])
-
-    box_w = max(max_w + 60, name_w + decal_w + 60)
-    box_h = sum(h + 6 for _, h in line_dims) + 60
-    cut   = 18
-
-    avatar_size = 56
-
-    if align == "left":
-        bg_color   = (18, 24, 28)
-        border     = (0, 220, 220)
-        text_color = (220, 255, 255)
-        box_x      = x + avatar_size + 20
-        avatar_x   = x
-    else:
-        bg_color   = (28, 18, 24)
-        border     = (255, 40, 200)
-        text_color = (255, 210, 240)
-        box_x      = x - box_w - avatar_size - 20
-        avatar_x   = x - avatar_size
-
-    pts = [
-        (box_x + cut, y),               (box_x + box_w, y),
-        (box_x + box_w, y + box_h - cut),(box_x + box_w - cut, y + box_h),
-        (box_x, y + box_h),             (box_x, y + cut),
-        (box_x + cut, y),
+def _local_fallback(names: List[str], num_lines: int) -> List[Dict]:
+    a, b = names
+    return [
+        {
+            "user":  a if i % 2 == 0 else b,
+            "text":  _FALLBACK_LINES[i % len(_FALLBACK_LINES)],
+            "align": "left" if i % 2 == 0 else "right",
+        }
+        for i in range(num_lines)
     ]
-    draw.polygon(pts, fill=bg_color)
-    draw.line(pts,   fill=border, width=2)
-    draw.line([(box_x, y + 28), (box_x + box_w, y + 28)], fill=border, width=1)
 
+# ── JSON extractor (robust against markdown wrapping) ─────────────────────────
+def _extract_json(text: str) -> Dict:
+    text = text.strip()
     try:
-        _draw_avatar(draw, avatar_x, y, avatar_size, user_name, fonts["name"])
-    except Exception:
+        return json.loads(text)
+    except json.JSONDecodeError:
         pass
+    start = text.find("{")
+    end   = text.rfind("}") + 1
+    if start != -1 and end > start:
+        try:
+            return json.loads(text[start:end])
+        except json.JSONDecodeError:
+            pass
+    raise ValueError("No valid JSON object found in model response.")
 
-    draw.text((box_x + 12, y + 6),
-              f"{prefix}{user_name}", fill=border, font=fonts["name"])
-    draw.text((box_x + box_w - decal_w - 16, y + 10),
-              decal, fill=(140, 140, 140), font=fonts["decal"])
+# ── Key sanity check (diagnostic only — does not block, just skips Groq) ──────
+def _looks_like_valid_key(api_key: str) -> bool:
+    if not api_key:
+        return False
+    if not api_key.startswith("gsk_"):
+        print(f"[ai_engine] GROQ_API_KEY format looks wrong (prefix '{api_key[:8]}...').")
+        return False
+    if len(api_key) < 40:
+        print(f"[ai_engine] GROQ_API_KEY suspiciously short ({len(api_key)} chars).")
+        return False
+    return True
 
-    text_y = y + 36
-    for (_, h), line in zip(line_dims, lines):
-        draw.text((box_x + 16, text_y), line, fill=text_color, font=fonts["chat"])
-        text_y += h + 6
+# ── Groq API caller ────────────────────────────────────────────────────────────
+def _call_groq(prompt: str, api_key: str) -> Optional[str]:
+    payload = {
+        "model": MODEL_NAME,
+        "messages": [{"role": "system", "content": prompt}],
+        "temperature": TEMPERATURE,
+    }
+    headers = {"Authorization": f"Bearer {api_key}"}
 
+    for attempt in range(1, MAX_RETRIES + 1):
+        print(f"[ai_engine][Groq] Attempt {attempt}/{MAX_RETRIES}...")
+        try:
+            resp = requests.post(GROQ_API_URL, json=payload, headers=headers, timeout=TIMEOUT)
+            resp.raise_for_status()
+            content = resp.json()["choices"][0]["message"]["content"]
+            print(f"[ai_engine][Groq] Got response ({len(content)} chars).")
+            return content
 
-# ── Frame builders ──────────────────────────────────────────────────────────
-def _build_chat_frame(
-    visible: List[Dict],
-    fonts:   dict,
-    width:   int,
-    height:  int,
-) -> Image.Image:
-    canvas = Image.new("RGB", (width, height), color=BG_COLOR)
-    draw   = ImageDraw.Draw(canvas)
-    cur_y  = 40
-    for msg in visible:
-        x_pos = 80 if msg["align"] == "left" else width - 80
-        _draw_bubble(
-            draw, msg["text"], x_pos, cur_y, msg["align"],
-            fonts, msg["user"], msg.get("decal", ""),
-        )
-        cur_y += msg["height"] + BUBBLE_PAD
-    return _apply_scanlines(canvas)
+        except requests.exceptions.HTTPError as exc:
+            code = exc.response.status_code if exc.response is not None else "?"
+            print(f"[ai_engine][Groq] HTTP {code}: {exc}")
+            if code in (401, 403):
+                print("    → Auth failure. Not retrying — check GROQ_API_KEY.")
+                return None
+            if code == 429:
+                backoff = 2 ** attempt
+                print(f"    → Rate limited. Backing off {backoff}s...")
+                time.sleep(backoff)
+            else:
+                time.sleep(2 ** attempt)
 
+        except requests.exceptions.Timeout:
+            print(f"[ai_engine][Groq] Timeout after {TIMEOUT}s.")
+            time.sleep(2 ** attempt)
 
-def _build_captcha_frame(fonts: dict, width: int, height: int) -> Image.Image:
-    canvas       = Image.new("RGB", (width, height), color=BG_COLOR)
-    captcha_path = os.path.join(ASSETS_DIR, "captcha.png")
-    if os.path.exists(captcha_path):
-        cap = Image.open(captcha_path).convert("RGBA")
-        max_w = 520
-        if cap.width > max_w:
-            ratio = max_w / cap.width
-            cap   = cap.resize((max_w, int(cap.height * ratio)), Image.Resampling.LANCZOS)
-        canvas.paste(cap, ((width - cap.width) // 2, (height - cap.height) // 2), cap)
-    else:
-        draw = ImageDraw.Draw(canvas)
-        draw.text(
-            (width // 2 - 200, height // 2),
-            "[MISSING: assets/captcha.png]",
-            fill=(255, 0, 0),
-            font=fonts["chat"],
-        )
-        print("[!] Warning: assets/captcha.png not found.")
-    return _apply_scanlines(canvas)
+        except Exception as exc:
+            print(f"[ai_engine][Groq] Unexpected error: {exc}")
+            time.sleep(2 ** attempt)
 
-
-# ── Background map loader ───────────────────────────────────────────────────
-def _fit_background(img: Image.Image, width: int, height: int) -> Image.Image:
-    canvas = Image.new("RGB", (width, height), color=BG_COLOR)
-    img    = img.convert("RGB")
-    img.thumbnail((width, height), Image.Resampling.LANCZOS)
-    canvas.paste(img, ((width - img.width) // 2, (height - img.height) // 2))
-    return canvas
-
-
-def _load_background_map() -> Optional[Image.Image]:
-    """Use the most recently generated alien map; fall back to generating one."""
-    candidates = sorted(
-        glob.glob(os.path.join(MAPS_DIR, "alien_sector_*.webp")),
-        key=os.path.getmtime,
-        reverse=True,
-    )
-    if candidates:
-        path = candidates[0]
-        print(f"[*] Background map: {os.path.basename(path)}")
-        return _fit_background(Image.open(path), CANVAS_W, CANVAS_H)
-
-    print("[!] No alien map found in output/maps/ — generating fallback.")
-    img, _ = alien_generator.generate_alien_world(save_to_disk=False)
-    return _fit_background(img, CANVAS_W, CANVAS_H)
-
-
-# ── Script loader ───────────────────────────────────────────────────────────
-def _load_script(filepath: str) -> Optional[List[Dict]]:
-    try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        script = data.get("script")
-        if isinstance(script, list) and len(script) > 0:
-            return script
-    except Exception as exc:
-        print(f"[!] Failed to load {filepath}: {exc}")
+    print("[ai_engine][Groq] All attempts exhausted.")
     return None
 
+# ── File writer ─────────────────────────────────────────────────────────────────
+def _save_script(obj: Dict, path: str) -> None:
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, indent=2)
 
-# ── Sequence renderer ───────────────────────────────────────────────────────
-def generate_dialogue_from_script(
-    script:   List[Dict],
-    basename: str,
-    bg_image: Optional[Image.Image] = None,
-) -> str:
-    fonts:     dict           = _load_fonts()
-    frames:    List[Image.Image] = []
-    durations: List[int]         = []
+# ── Main generator ─────────────────────────────────────────────────────────────
+def generate_scenarios(request_context: str = "") -> List[str]:
+    """
+    Generate SCENARIOS_PER_RUN dialogue scripts.
+    Each script is written as its OWN file to output/scripts/ with a
+    timestamp + index + short UUID filename — unique, sortable, and
+    traceable back to the run that created it.
 
-    if bg_image is not None:
-        frames.append(bg_image.copy().convert("RGB"))
-        durations.append(FRAME_DURATION_BG)
+    Returns the list of created file paths.
+    """
+    ts = os.getenv("PIPELINE_RUN_TS", "").strip()
+    if not ts:
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        os.environ["PIPELINE_RUN_TS"] = ts
+        print(f"[ai_engine] Standalone run — PIPELINE_RUN_TS={ts}")
 
-    dummy_draw = ImageDraw.Draw(Image.new("RGB", (1, 1)))
-    for msg in script:
-        msg.setdefault(
-            "decal",
-            f"[SYS] // {random.randint(0x1000, 0xFFFF):04X}"
-            if msg["align"] == "left"
-            else f"[NET] // {random.randint(10, 99)}",
-        )
-        msg["height"] = _bubble_height(dummy_draw, msg["text"], fonts["chat"])
+    api_key = os.getenv("GROQ_API_KEY", "").strip()
+    groq_available = _looks_like_valid_key(api_key)
+    if not groq_available:
+        print("[ai_engine] Groq unavailable — local fallback scripts will be used.")
 
-    visible: List[Dict] = []
-    for msg in script:
-        visible.append(msg)
-        while sum(m["height"] + BUBBLE_PAD for m in visible) > (CANVAS_H - 180):
-            visible.pop(0)
-        frames.append(_build_chat_frame(visible, fonts, CANVAS_W, CANVAS_H))
-        durations.append(FRAME_DURATION_CHAT)
+    created_files: List[str] = []
 
-    frames.append(_build_captcha_frame(fonts, CANVAS_W, CANVAS_H))
-    durations.append(FRAME_DURATION_FINAL)
+    for i in range(1, SCENARIOS_PER_RUN + 1):
+        robots = generate_robot_pair()
+        print(f"\n[ai_engine] Scenario {i}/{SCENARIOS_PER_RUN} — robots: {robots[0]} & {robots[1]}")
 
-    output_path = os.path.join(DIALOGUES_DIR, f"dialogue_seq_{basename}.webp")
-    frames[0].save(
-        output_path,
-        format="WEBP",
-        save_all=True,
-        append_images=frames[1:],
-        duration=durations,
-        loop=0,
-        lossless=True,
-        quality=100,
-    )
+        content: Optional[Dict] = None
 
-    # Always update latest_dialogue.webp so README always shows the newest output
-    shutil.copy2(output_path, LATEST_PATH)
-    print(f"[+] Updated: {LATEST_PATH}")
+        if groq_available:
+            prompt = build_prompt(robots, LINES_MIN, LINES_MAX)
+            if request_context:
+                prompt += f"\nExtra context: {request_context}"
+            raw = _call_groq(prompt, api_key)
+            if raw:
+                try:
+                    parsed = _extract_json(raw)
+                    if isinstance(parsed.get("script"), list) and len(parsed["script"]) > 0:
+                        content = parsed
+                        print(f"[ai_engine] Groq scenario {i} parsed OK ({len(parsed['script'])} lines).")
+                    else:
+                        print("[ai_engine] Schema mismatch — falling back.")
+                except Exception as exc:
+                    print(f"[ai_engine] JSON parse failed: {exc}. Falling back.")
 
-    return output_path
+        if content is None:
+            num_lines = random.randint(LINES_MIN, LINES_MAX)
+            script    = _local_fallback(robots, num_lines)
+            content   = {"title": f"Fallback: {robots[0]} vs {robots[1]}", "script": script}
+            print(f"[ai_engine] Using local fallback ({num_lines} lines).")
+
+        short_uuid = uuid.uuid4().hex[:8]
+        filename   = f"script_{ts}_{i:02d}_{short_uuid}.json"
+        filepath   = os.path.join(SCRIPTS_DIR, filename)
+
+        _save_script(content, filepath)
+        print(f"[ai_engine] Saved: {filepath}")
+        created_files.append(filepath)
+
+    return created_files
 
 
-# ── Entry point ─────────────────────────────────────────────────────────────
 def main() -> None:
-    os.makedirs(DIALOGUES_DIR, exist_ok=True)
+    import argparse
+    parser = argparse.ArgumentParser(description="Generate AI dialogue scripts → output/scripts/")
+    parser.add_argument("--request", "-r", default="", help="Optional theme/context")
+    args = parser.parse_args()
 
-    print("[*] Loading background map...")
-    bg_img = _load_background_map()
-
-    # PIPELINE_RUN_TS is set by orchestrator.py before this module runs.
-    # Filter to only render JSON files created in this pipeline run.
-    # If empty (standalone run), render all available JSON files.
-    run_marker = os.getenv("PIPELINE_RUN_TS", "").strip()
-    if run_marker:
-        print(f"[*] Filtering for run marker: {run_marker}")
-    else:
-        print("[!] PIPELINE_RUN_TS not set — rendering all available JSON files.")
-
-    pattern = os.path.join(DIALOGUES_DIR, "ai_dialogue_raw_*.json")
-    all_files = sorted(glob.glob(pattern))
-    files = [f for f in all_files if run_marker in os.path.basename(f)] if run_marker else all_files
-
-    if not files:
-        if all_files:
-            print(f"[!] No JSON files matched run marker '{run_marker}'.")
-            print(f"    Found {len(all_files)} file(s) from previous runs — rendering most recent.")
-            files = [all_files[-1]]
-        else:
-            print("[!] No ai_dialogue_raw_*.json files found. Using built-in fallback.")
-            scripts = [random.choice(FALLBACK_DIALOGUES)]
-            names   = ["fallback"]
-            for script, name in zip(scripts, names):
-                out = generate_dialogue_from_script(script, basename=name, bg_image=bg_img)
-                size_kb = os.path.getsize(out) / 1024
-                print(f"[+] Saved: {out} ({size_kb:.1f} KB)")
-            return
-
-    scripts, names = [], []
-    for path in files:
-        script = _load_script(path)
-        if script:
-            scripts.append(script)
-            names.append(os.path.splitext(os.path.basename(path))[0])
-        else:
-            print(f"[!] Skipping invalid JSON: {path}")
-
-    if not scripts:
-        print("[!] All JSON files invalid. Using built-in fallback.")
-        scripts = [random.choice(FALLBACK_DIALOGUES)]
-        names   = ["fallback"]
-
-    for script, name in zip(scripts, names):
-        print(f"[*] Rendering: {name} ({len(script)} lines)...")
-        out = generate_dialogue_from_script(script, basename=name, bg_image=bg_img)
-        size_kb = os.path.getsize(out) / 1024
-        print(f"[+] Saved: {out} ({size_kb:.1f} KB)")
+    files = generate_scenarios(request_context=args.request)
+    print(f"\n[ai_engine] Done. {len(files)} script file(s) created in output/scripts/.")
 
 
 if __name__ == "__main__":

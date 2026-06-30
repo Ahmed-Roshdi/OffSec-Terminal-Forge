@@ -50,14 +50,7 @@ jobs:
           [ "$MISSING" -eq 1 ] && exit 1
           echo "[+] All secrets loaded from Dialogue_Generator-AI."
 
-      # ── 5. Diagnose Groq API key (NON-FATAL — pipeline has a fallback) ─────
-      #
-      #  FIX: previous version used `exit 1` on every Groq failure, which
-      #  killed the ENTIRE workflow even though ai_engine.py / dialogue_
-      #  generator.py both have working local fallback dialogue. A temporary
-      #  Groq rate-limit or outage should NOT block map+dialogue generation.
-      #  We diagnose and warn here; the Python layer decides what to do.
-      #
+      # ── 5. Diagnose Groq API key (NON-FATAL — ai_engine has a fallback) ────
       - name: 🔑 Diagnose Groq API key
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -70,7 +63,6 @@ jobs:
           if [[ "$GROQ_API_KEY" != gsk_* ]]; then
             echo "[!] Key does not start with 'gsk_' — WRONG FORMAT"
             echo "    → Regenerate at https://console.groq.com/keys"
-            echo "    → Update secret GROQ_API_KEY in environment Dialogue_Generator-AI"
             echo "GROQ_OK=false" >> "$GITHUB_ENV"
           else
             echo "[+] Format OK (starts with gsk_)"
@@ -82,31 +74,11 @@ jobs:
 
             echo "[*] HTTP Status : $HTTP_STATUS"
             case "$HTTP_STATUS" in
-              200)
-                echo "[+] Groq API key VALID ✅"
-                echo "GROQ_OK=true" >> "$GITHUB_ENV"
-                ;;
-              401)
-                echo "[!] 401 Unauthorized — key is INVALID or MALFORMED"
-                echo "    → Regenerate at https://console.groq.com/keys"
-                cat /tmp/groq_resp.json
-                echo "GROQ_OK=false" >> "$GITHUB_ENV"
-                ;;
-              403)
-                echo "[!] 403 Forbidden — key REVOKED or quota EXCEEDED"
-                echo "    → Check: https://console.groq.com/keys"
-                cat /tmp/groq_resp.json
-                echo "GROQ_OK=false" >> "$GITHUB_ENV"
-                ;;
-              429)
-                echo "[!] 429 Rate limit — key is valid but rate limited right now"
-                echo "GROQ_OK=false" >> "$GITHUB_ENV"
-                ;;
-              *)
-                echo "[!] Unexpected HTTP $HTTP_STATUS"
-                cat /tmp/groq_resp.json
-                echo "GROQ_OK=false" >> "$GITHUB_ENV"
-                ;;
+              200) echo "[+] Groq API key VALID ✅"; echo "GROQ_OK=true" >> "$GITHUB_ENV" ;;
+              401) echo "[!] 401 Unauthorized — key INVALID."; cat /tmp/groq_resp.json; echo "GROQ_OK=false" >> "$GITHUB_ENV" ;;
+              403) echo "[!] 403 Forbidden — key REVOKED/quota EXCEEDED."; cat /tmp/groq_resp.json; echo "GROQ_OK=false" >> "$GITHUB_ENV" ;;
+              429) echo "[!] 429 Rate limited — key is valid."; echo "GROQ_OK=false" >> "$GITHUB_ENV" ;;
+              *)   echo "[!] Unexpected HTTP $HTTP_STATUS"; cat /tmp/groq_resp.json; echo "GROQ_OK=false" >> "$GITHUB_ENV" ;;
             esac
           fi
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -117,6 +89,9 @@ jobs:
         run: python engines/alien_generator.py
 
       # ── 7. Run AI dialogue pipeline ────────────────────────────────────────
+      # orchestrator.py runs ai_engine.py then dialogue_generator.py in the
+      # SAME process, so PIPELINE_RUN_TS set by orchestrator is visible to
+      # both — this is what lets the render engine match the right script.
       - name: 🧠 Run AI dialogue pipeline (orchestrator)
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -124,32 +99,37 @@ jobs:
         run: python engines/orchestrator.py
 
       # ── 8. Verify output ───────────────────────────────────────────────────
-      #
-      #  Real safety net: this is the ONLY place that should fail the build
-      #  for missing output, since by now both Groq AND the fallback path
-      #  have had their chance to produce files.
-      #
+      # Checks each output subdirectory independently — scripts, maps, and
+      # dialogues — so a failure points at exactly which stage broke.
       - name: 🔍 Verify output files were created
         run: |
-          echo "[*] Files in output/:"
+          echo "[*] Directory listing — output/:"
           find output/ -type f | sort
-          COUNT=$(find output/ -type f | wc -l)
-          WEBP=$(find output/ -name "*.webp" | wc -l)
-          DIALOGUES=$(find output/dialogues -type f 2>/dev/null | wc -l)
-          echo "[*] Total: $COUNT files  |  WebP: $WEBP  |  Dialogue files: $DIALOGUES"
+          echo ""
 
-          if [ "$COUNT" -eq 0 ]; then
-            echo "[!] output/ is empty — nothing to commit. Aborting."
+          MAPS=$(find output/maps      -type f 2>/dev/null | wc -l)
+          SCRIPTS=$(find output/scripts -type f 2>/dev/null | wc -l)
+          DIALOGUES=$(find output/dialogues -type f 2>/dev/null | wc -l)
+
+          echo "[*] Maps      : $MAPS"
+          echo "[*] Scripts   : $SCRIPTS"
+          echo "[*] Dialogues : $DIALOGUES"
+          echo ""
+
+          FAIL=0
+          [ "$MAPS"      -eq 0 ] && echo "[!] No map files — alien_generator.py failed." && FAIL=1
+          [ "$SCRIPTS"   -eq 0 ] && echo "[!] No script files — ai_engine.py produced nothing in output/scripts/." && FAIL=1
+          [ "$DIALOGUES" -eq 0 ] && echo "[!] No dialogue files — dialogue_generator.py failed to render." && FAIL=1
+
+          if [ "$FAIL" -eq 1 ]; then
+            echo "[!] Check the orchestrator logs above for the real error."
             exit 1
           fi
-          if [ "$DIALOGUES" -eq 0 ]; then
-            echo "[!] No dialogue files generated."
-            echo "[!] Check orchestrator.py / ai_engine.py logs above for the real error."
-            exit 1
-          fi
-          echo "[+] Output verified."
+          echo "[+] All three output stages verified."
 
       # ── 9. Commit & push to auto/generate-assets ──────────────────────────
+      # Explicitly stages each output subdirectory so the scripts/ folder is
+      # never silently dropped, and `-f` bypasses .gitignore on output/.
       - name: 📤 Commit & push to auto/generate-assets
         run: |
           git config user.name  "github-actions[bot]"
@@ -158,7 +138,14 @@ jobs:
           git fetch origin main
           git checkout -B auto/generate-assets origin/main
 
-          git add -f output/
+          for dir in output/maps output/scripts output/dialogues; do
+            if [ -d "$dir" ]; then
+              git add -f "$dir"
+              echo "[+] Staged: $dir"
+            else
+              echo "[!] Skipped (not found): $dir"
+            fi
+          done
 
           echo "[*] Staged files:"
           git diff --cached --name-only
@@ -167,7 +154,7 @@ jobs:
             echo "[*] No new files — output identical to last run."
             echo "HAS_CHANGES=false" >> "$GITHUB_ENV"
           else
-            git commit -m "🤖 chore: auto-generated AI dialogue & map [skip ci]"
+            git commit -m "🤖 chore: auto-generated map, script & dialogue [skip ci]"
             git push origin auto/generate-assets --force
             echo "[+] Pushed to auto/generate-assets."
             echo "HAS_CHANGES=true" >> "$GITHUB_ENV"
@@ -194,7 +181,7 @@ jobs:
               --base main \
               --head auto/generate-assets \
               --title "🤖 Automated: Add generated AI assets" \
-              --body "$(printf '## 🧠 Auto-generated Assets\n\n| Field | Value |\n|---|---|\n| Triggered | workflow_dispatch |\n| Groq API | %s |\n| Branch | auto/generate-assets → main |\n| Output | output/ |\n\nAuto-merged by workflow.' "${{ env.GROQ_OK }}")" \
+              --body "$(printf '## 🧠 Auto-generated Assets\n\n| Field | Value |\n|---|---|\n| Triggered | workflow_dispatch |\n| Groq API | %s |\n| Branch | auto/generate-assets → main |\n| Output | output/maps, output/scripts, output/dialogues |\n\nAuto-merged by workflow.' "${{ env.GROQ_OK }}")" \
               --label automated)
             PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
             echo "[+] Created PR #$PR_NUMBER"

@@ -33,6 +33,40 @@
 
 ---
 
+## 🏗️ Architecture Change — Script/Render Decoupling
+
+**Problem:** `ai_engine.py` wrote dialogue JSON directly into `output/dialogues/`
+— the same folder the renderer wrote its final WebP output into. Any mismatch
+in the glob pattern, filename timing, or `PIPELINE_RUN_TS` value caused the
+render engine to find zero matching files and silently fall through to the
+built-in fallback dialogue, with no clear signal in the logs about which
+stage actually failed.
+
+**Fix:** Split into two distinct directories with one engine each:
+
+| Stage | Engine | Writes to |
+|-------|--------|-----------|
+| Script generation | `ai_engine.py` | `output/scripts/script_{ts}_{i}_{uuid}.json` |
+| Rendering | `dialogue_generator.py` | `output/dialogues/dialogue_seq_{name}.webp` |
+
+`ai_engine.py` now **only** produces script data — it never touches
+`output/dialogues/`. `dialogue_generator.py` reads exactly **one** script
+file per run (the most recent one matching `PIPELINE_RUN_TS`, falling back
+to the most recent script overall, falling back to the built-in dialogue
+pool only if `output/scripts/` is completely empty).
+
+Filenames use a timestamp prefix (`script_20260630T120000Z_01_a1b2c3d4.json`)
+so a plain `sorted(glob.glob(...))` is already in chronological order — no
+extra sort key needed.
+
+**Workflow change:** the verify step (Step 8) now checks `output/maps`,
+`output/scripts`, and `output/dialogues` independently and reports exactly
+which stage produced zero files. The commit step (Step 9) stages each of
+the three directories explicitly with `git add -f`, rather than relying on
+a single `git add -f output/` to catch everything.
+
+---
+
 ## 📋 TODO
 
 ### 🔴 High Priority
