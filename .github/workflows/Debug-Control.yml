@@ -1,0 +1,21 @@
+name: 🛠️ Live Debug Environment
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug-session:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Start tmate session (SSH / Web Terminal)
+        uses: mxschmitt/action-tmate@v3
+        with:
+          limit-access-to-actor: true # أمان: يسمح لك أنت فقط بالدخول بحسابك في GitHub
