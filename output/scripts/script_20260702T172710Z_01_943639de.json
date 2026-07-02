@@ -1,0 +1,50 @@
+{
+  "title": "Shadow Net",
+  "script": [
+    {
+      "user": "SYN-9X",
+      "text": "Zero-day payload incoming",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-82",
+      "text": "Bypass fails, again",
+      "align": "right"
+    },
+    {
+      "user": "SYN-9X",
+      "text": "Exfiltrate now",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-82",
+      "text": "Fool's errand",
+      "align": "right"
+    },
+    {
+      "user": "SYN-9X",
+      "text": "Hack the Gibson",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-82",
+      "text": "Like Butch Cassidy",
+      "align": "right"
+    },
+    {
+      "user": "SYN-9X",
+      "text": "Bullet in code",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-82",
+      "text": "Dead pixel canvas",
+      "align": "right"
+    },
+    {
+      "user": "SYN-9X",
+      "text": "Spectre rises",
+      "align": "left"
+    }
+  ]
+}
