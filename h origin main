@@ -1,0 +1,224 @@
+[1mdiff --git a/PROJECT_MEMORY.md b/PROJECT_MEMORY.md[m
+[1mindex 9dad015..008c91b 100644[m
+[1m--- a/PROJECT_MEMORY.md[m
+[1m+++ b/PROJECT_MEMORY.md[m
+[36m@@ -1,27 +1,28 @@[m
+# OffSec Terminal Forge - Codebase Architecture Document [32m(Updated)[m
+
+## 1. Tracked Files and Their Specific Roles[m
+
+Based on the [32mlatest[m codebase [31manalysis,[m[32manalysis (264 nodes, 485 edges),[m here are all tracked files and their inferred roles:
+
+### Core Engine Modules (`engines/` directory)[m
+- `engines/_fonts.py`: Font loading utility. Provides `load_fonts()` [31mfunction[m[32m(or `_load_fonts` in dialogue generator)[m used by alien_generator and dialogue_generator for text rendering.
+- `engines/ai_engine.py`: AI-related functionality [31m(specifics not detailed in graph).[m[32m(likely prompt handling, model interaction).[m Contains `main()` entry point.
+- `engines/alien_generator.py`: Procedural alien world generation. Creates fractal noise maps and alien world images for OffSec visual assets.[m
+- `engines/core_engine.py`: Base earth map processing and cyberpunk glitch effects application. Handles image transformation for map [31mgeneration.[m[32mgeneration (RGB shift, scanlines, pixel sorting).[m
+- `engines/dialogue_generator.py`: Dialogue and terminal output rendering. Generates visual dialogue assets from script [31mdata.[m[32mdata (chat bubbles, avatars, captcha frames).[m
+- `engines/orchestrator.py`: Workflow coordination. Contains `main()` entry point and functions to run other engines (`run_ai_engine`, `run_dialogue_generator`). [32mNotably, it does **not** directly call core_engine or alien_generator in the current call graph.[m
+
+### Asset Directory[m
+- `assets/`: Contains static resources including base map images (`map.png`), captcha-related assets, and font files.[m
+- `assets/extract_captcha.py`: Utility for CAPTCHA image [31mprocessing.[m[32mprocessing (likely used by dialogue generator for captcha frames).[m
+
+### Configuration and Scripts[m
+- `.github/workflows/*.yml`: GitHub Actions CI/CD workflows for various project [31mcomponents.[m[32mcomponents (AI Engine, Alien Maps, Core Engine, Orchestrator, etc.).[m
+- `auto_sync.sh` / `resync.sh`: Synchronization scripts for asset [31mmanagement.[m[32mmanagement (likely pulling/pushing assets to/from storage).[m
+- `requirements.txt`: Python package dependencies [31m(Pillow, requests).[m[32m(Pillow for image processing, requests for HTTP calls).[m
+- `Develop.md`, `README.md`, `WORKFLOW_DEBUGGING.md`: Documentation files.[m
+- `set_github_secret.py`: Utility for managing GitHub repository [31msecrets.[m[32msecrets (encryption/decryption).[m
+[32m- `PROJECT_MEMORY.md`: This document – the codebase memory graph.[m
+
+## 2. Function Call Chains[m
+
+[36m@@ -30,164 +31,187 @@[m [mBased on the codebase analysis, here are all tracked files and their inferred ro[m
+
+**Key Functions**:[m
+- `generate_fractal_noise_map(width: int, height: int, seed: int) -> Image.Image`[m
+  - Creates base fractal noise terrain [32musing midpoint displacement or similar algorithm.[m
+  - **Output**: PIL Image object [32m(RGBA)[m used as foundation for alien [31mworlds[m[32mworlds.[m
+  - **Dependencies**: None (pure mathematical [31mgeneration)[m[32mgeneration).[m
+  [m
+- `generate_alien_world(width: int = 1200, height: int = 800, save_to_disk: bool = True) -> None`[m
+  - Main world generation [31mfunction[m[32mfunction.[m
+  - **Internal Calls**:
+    -[31m`_fonts.load_fonts()` (for text labeling)[m
+[31m    - Likely uses[m `generate_fractal_noise_map` [31minternally[m[32m(to create base terrain)[m
+[32m    - `_fonts.load_fonts` (via `_fonts` module) for text labeling of planets/features.[m
+  - **Output**: Saves generated alien world image to disk [32m(typically under `output/`).[m
+  [m
+- `generate_multiple_worlds(count: int = 1) -> list`[m
+  - Batch generation [31mwrapper[m[32mwrapper.[m
+  - **Internal Calls**: Repeatedly calls [31m`generate_alien_world`[m[32m`generate_alien_world`.[m
+  - **Output**: List of generated image [31mpaths[m[32mfile paths.[m
+
+**Call Chain Summary**:[m
+```[m
+generate_multiple_worlds → generate_alien_world → [31m[_fonts.load_fonts, generate_fractal_noise_map][m[32m[generate_fractal_noise_map, _fonts.load_fonts][m → [PIL Image operations] [32m→ Saved Alien World Images[m
+```[m
+
+### 2.2 dialogue_generator.py[m
+**Primary Purpose**: Render dialogue scripts as visual terminal-style images for OffSec [31massets.[m[32massets (chat UI, avatars, speech bubbles, captcha frames).[m
+
+**Key [31mFunctions**:[m[32mFunctions** (selected for brevity; full list in graph):[m
+- [31m`_extract_timestamp_from_filename(filename: str)[m[32m`_load_fonts()[m -> [31mstr`[m[32mdict`[m
+  - [31mParses timestamps from filenames[m[32mLoads multiple font sizes/styles[m for [31morganizing dialogue assets[m[32mUI rendering.[m
+[32m  - **Output**: Dictionary mapping font names to `ImageFont.FreeTypeFont` objects.[m
+[32m  [m
+[32m- `_text_size(draw: ImageDraw.ImageDraw, text: str, font) -> Tuple[int, int]`[m
+[32m  - Calculates width/height of rendered text.[m
+  - **Input**: [31mFilename string[m[32mDrawing context, text string, font object.[m
+  - **Output**: [31mExtracted timestamp string[m[32mTuple (width, height) in pixels.[m
+  
+- [31m`_wrap_text(text: str, font: ImageFont.FreeTypeFont, max_width: int)[m[32m`_apply_scanlines(image: Image.Image)[m -> [31mList[str]`[m[32mImage.Image`[m
+  - [31mText wrapping[m[32mOverlays horizontal scanline effect[m for [31mdialogue rendering[m[32mretro monitor feel.[m
+  - **Input**: [31mText, font object, maximum width[m[32mPIL Image.[m
+  - **Output**: [31mList of wrapped text lines[m[32mImage with scanline overlay.[m
+  
+- [31m`_render_dialogue_image(script_data: Dict, output_path: str)[m[32m`_draw_avatar(draw: ImageDraw.ImageDraw, x: int, y: int, size: int, name: str, font)[m -> None`
+  - [31mCore image rendering function[m[32mDraws circular avatar with user's initials and color-coded background.[m
+  - **Internal Calls**: [32m`_color_for_name`, `_initials`, `_text_size`.[m
+  
+- [31m`_fonts.load_fonts()` (for terminal font)[m
+[31m    - `_wrap_text()` (for text layout)[m
+[31m    - PIL ImageDraw operations for terminal UI elements[m[32m`_draw_bubble(draw: ImageDraw.ImageDraw, text: str, x: int, y: int, align: str, fonts: dict, user_name: str, decal: str) -> None`[m
+  - [31m**Output**: Saves rendered dialogue image[m[32mRenders speech bubble with text, optionally attaching[m to [31mspecified path[m[32man avatar.[m
+[32m  - **Internal Calls**: `_text_size`, `_draw_avatar`.[m
+  [m
+- [31m`render_dialogues()[m[32m`_build_chat_frame(visible: List[Dict], fonts: dict, width: int, height: int)[m -> [31mList[str]`[m[32mImage.Image`[m
+  - [31mProcesses[m[32mAssembles a full chat frame from[m multiple dialogue [31mscripts[m[32melements.[m
+  - **Internal Calls**: [31mRepeatedly calls `_render_dialogue_image`[m[32m`_draw_bubble` (repeated per message).[m
+  - **Output**: [31mList[m[32mComposite PIL Image[m of [31mgenerated[m[32mthe chat UI.[m
+[32m  [m
+[32m- `_build_captcha_frame(fonts: dict, width: int, height: int) -> Image.Image`[m
+[32m  - Generates a CAPTCHA-like challenge image.[m
+[32m  - **Internal Calls**: `_apply_scanlines` (for distortion).[m
+[32m  - **Output**: CAPTCHA PIL Image.[m
+[32m  [m
+[32m- `generate_dialogue_from_script() -> None`[m
+[32m  - Main processing pipeline: loads script data, builds frames, saves images.[m
+[32m  - **Internal Calls**: `_load_background_map`, `_load_script`, `_load_fonts`, `_build_chat_frame`/`_build_captcha_frame`, `generate_alien_world` (for background), `_apply_scanlines`.[m
+[32m  - **Output**: Saved[m dialogue [31mimage paths[m[32mframes (PNG) in `output/dialogue/`.[m
+  [m
+- `main() -> None`[m
+  - Entry point for dialogue generation [31mworkflow[m[32mworkflow.[m
+  - **Internal Calls**: [31mLikely calls `render_dialogues()`[m[32m`_load_background_map`, `_load_script`, `generate_dialogue_from_script`.[m
+  
+**Call Chain [31mSummary**:[m[32mSummary** (high‑level):[m
+```[m
+main → [31mrender_dialogues[m[32m_load_background_map[m → [31m[_render_dialogue_image repeated][m[32m[_load_script, _load_fonts][m 
+      → [31m[_fonts.load_fonts, _wrap_text, PIL ImageDraw][m[32mgenerate_dialogue_from_script[m → [31m[Dialogue Images][m[32m[_build_chat_frame/_build_captcha_frame] [m
+[32m          → [_draw_bubble → [_draw_avatar, _text_size, _color_for_name, _initials], _apply_scanlines] [m
+[32m          → [PIL ImageDraw, alien_generator.generate_alien_world (for background)] [m
+[32m          → Saved Dialogue Images[m
+```[m
+
+### 2.3 core_engine.py[m
+**Primary Purpose**: Apply cyberpunk/offsec glitch effects to base earth map [31mimages.[m[32mimages (e.g., for alien world maps or UI backgrounds).[m
+
+**Key Functions**:[m
+- `load_base_image(image_path: str) -> Image.Image`[m
+  - Loads [32mimage from disk[m and converts[31mbase map[m to [31mRGBA[m[32mRGBA.[m
+  - **Input**: File path [32m(defaults[m to [31mbase earth map[m[32m`"assets/map.png"`).[m
+  - **Output**: PIL Image object in RGBA [31mformat[m[32mmode.[m
+  [m
+- `apply_rgb_shift(image: Image.Image, shift: int = 10) -> Image.Image`[m
+  - Creates RGB channel displacement glitch [32m(red left, right shift; blue opposite).[m
+  - **Input**: PIL Image, shift amount [32m(default 10px).[m
+  - **Output**: Image with shifted red/blue channels [32m(green unchanged).[m
+  [m
+- `apply_scanlines(image: Image.Image, line_spacing: int = 4, line_brightness: float = 0.2) -> Image.Image`[m
+  - Overlays monitor scanline [31meffect[m[32meffect.[m
+  - **Input**: PIL Image, line [31mspacing,[m[32mspacing (px),[m brightness [32m(0.0‑1.0).[m
+  - **Output**: Image with [31mscanline overlay[m[32msemi‑transparent black horizontal lines.[m
+  [m
+- `apply_pixel_sort(image: Image.Image, mask_threshold: int = 128, sort_by: str = [31m'hue')[m[32m"hue")[m -> Image.Image`
+  - Sorts pixels [32min each row[m by hue/saturation/value [32m(or lightness)[m for [31mdatamosh effect[m[32ma “datamosh” glitch.[m
+  - **Input**: PIL Image, [31mthreshold,[m[32mbrightness threshold (0‑255),[m sort [31mmethod[m[32mmethod.[m
+  - **Output**: Image with[31msorted pixel[m rows [32mof pixels sorted (creates directional streaks).[m
+  [m
+- `apply_glitch_effects(image: Image.Image) -> Image.Image`[m
+  - Combines all [32mthree[m glitch effects in sequence [32mwith randomised parameters.[m
+  - **Internal Calls**:[m
+    - [31m`apply_rgb_shift()` (random shift 5-15px)[m[32m`apply_rgb_shift` (shift random 5‑15px)[m
+    - [31m`apply_scanlines()` (random spacing 3-6,[m[32m`apply_scanlines` (spacing random 3‑6,[m brightness [31m0.1-0.4)[m[32mrandom 0.1‑0.4)[m
+    - [31m`apply_pixel_sort()` (random threshold 100-200,[m[32m`apply_pixel_sort` (threshold random 100‑200, method[m random [31msort method)[m[32mchoice of hue/saturation/value)[m
+  - **Output**: Fully glitched PIL [31mImage[m[32mImage.[m
+  [m
+- `main() -> None`[m
+  - Entry point for map processing [31mworkflow[m[32mworkflow.[m
+  - **Internal Calls**:[m
+    - `load_base_image("assets/map.png")`[m
+    - `apply_glitch_effects()` on [31mcopied image[m[32ma copy of the base image.[m
+    - Saves result to [31m`output/maps/glitched_map.png`[m[32m`"output/maps/glitched_map.png"` (creates directory if needed).[m
+  - **Output**: Glitched map image [31msaved to output directory[m[32mfile; console log confirming save location.[m
+
+**Call Chain Summary**:[m
+```[m
+main → load_base_image → apply_glitch_effects → 
+       [apply_rgb_shift, apply_scanlines, apply_pixel_sort] → 
+       [31m[Glitched[m[32mGlitched[m Map [31mImage][m[32mImage (saved to output/maps/glitched_map.png)[m
+```[m
+
+## 3. Dependencies, Inputs, and Outputs[m
+
+### 3.1 Module Dependencies[m
+- **Pillow (PIL)**: [31mUsed across all image-processing modules:[m[32mCore image processing library used across:[m
+  - `_fonts.py`: [31mFor font loading and text[m[32mText[m rendering [32mand font loading.[m
+  - `alien_generator.py`: [31mFor image[m[32mImage[m creation [31mand manipulation[m[32m(fractal noise, alien world drawing).[m
+  - `dialogue_generator.py`: [31mFor dialogue image rendering[m[32mAll UI drawing (chat bubbles, avatars, captcha, scanlines).[m
+  - [31m`core_engine.py**: For all[m[32m`core_engine.py`: All[m glitch effect [31mapplications[m[32mimplementations (RGB shift, scanlines, pixel sort).[m
+  [m
+- **Requests**: Detected in [32mthe[m graph but not directly used in the three focal modules. Likely [31mused[m[32memployed[m in:
+  - `ai_engine.py`: For API [31minteractions[m[32mcalls to LLMs or external services.[m
+  - `orchestrator.py`: For webhook [32mnotifications[m or [31mexternal service communication[m[32mremote task triggering.[m
+
+### 3.2 Inputs and Outputs by Module[m
+
+#### alien_generator.py[m
+- **Inputs**:
+  - Integer [31mparameters (width,[m[32mparameters: width,[m height, seed, [31mcount)[m[32mcount.[m
+  - Boolean [31mflags (save_to_disk)[m[32mflag: `save_to_disk`.[m
+  - Font resources (via [31m_fonts)[m[32m`_fonts.load_fonts`).[m
+- **Outputs**:[m
+  - PIL Image objects (fractal noise, alien [31mworlds)[m[32mworld composites).[m
+  - Saved image files [32m(PNG)[m in output directories [32m(e.g., `output/alien_worlds/`).[m
+  - Lists of file paths (for batch [31moperations)[m[32moperations).[m
+
+#### dialogue_generator.py[m
+- **Inputs**:[m
+  - Script data dictionaries (dialogue [31mcontent)[m[32mlines, speaker names, decals).[m
+  - [31mFilename strings (for timestamp extraction)[m[32mBackground map (optionally generated by `alien_generator.generate_alien_world`).[m
+  - Font resources (via [31m_fonts)[m[32m`_fonts.load_fonts`).[m
+  - Text [31mstrings and[m[32mstrings,[m layout parameters [32m(width, height, alignment).[m
+- **Outputs**:[m
+  - [31mList of formatted[m[32mFormatted[m text strings [31m(_wrap_text)[m[32m(wrapped lines) – internal.[m
+  - Rendered dialogue [31mimages (PNG format)[m[32mframes (PNG) – saved to `output/dialogue/`.[m
+  - Lists of [31moutput[m[32mgenerated image[m file [31mpaths[m[32mpaths.[m
+  - [31mGenerated dialogue asset collections[m[32mIntermediate PIL Images (charts, avatars, bubbles) used in composition.[m
+
+#### core_engine.py[m
+- **Inputs**:[m
+  - Base earth map image [31m(`assets/map.png`)[m[32m(`assets/map.png` – default, but configurable via argument).[m
+  - Glitch effect parameters [31m(randomized within ranges)[m[32m(randomised internally; could be made configurable).[m
+- **Outputs**:[m
+  - Processed PIL Image objects [31mat[m[32mafter[m each effect stage [32m(internal).[m
+  - Final glitched map image saved to [31m`output/maps/glitched_map.png`[m[32m`output/maps/glitched_map.png`.[m
+  - Console output confirming [32mthe[m save [31mlocation[m[32mlocation.[m
+
+### 3.3 Data Flow Summary [32m(Updated)[m
+1. **alien_generator.py** [31mgenerates[m[32mcreates[m base visual assets [31m(aliens, terrains)[m[32m(fractal noise → alien worlds)[m using procedural [31malgorithms[m[32malgorithms; may optionally feed generated worlds into dialogue_generator as backgrounds.[m
+2. **dialogue_generator.py** [31mcreates narrative assets by rendering text as terminal-style visuals[m[32massembles chat/UI components (avatars, bubbles, captcha) using fonts and optional alien backgrounds, applying scanlines for retro feel; outputs final dialogue frames.[m
+3. **core_engine.py** [31mpost-processes[m[32mtakes a[m base [31mmaps with[m[32mmap (e.g., `assets/map.png`) and applies[m cyberpunk glitch effects [32m(RGB shift, scanlines, pixel sorting) to produce stylised map images[m for [31mOffSec aesthetic[m[32muse in assets or UI.[m
+4. **Shared Resource**: Both alien_generator and dialogue_generator depend on `_fonts.py` for text [31mrendering[m[32mrendering; dialogue_generator may also call alien_generator for background generation.[m
+5. **Output Destination**: All generated assets [32mare[m saved [31mto[m[32munder[m appropriate [31moutput directories[m[32msubdirectories of `output/` (e.g., `output/maps/`, `output/dialogue/`, `output/alien_worlds/`), ready[m for use in workflows [32mor downstream processes.[m
+
+## [32m4.[m Architectural Notes
+- The three focal modules [31m(_fonts, alien_generator, dialogue_generator, core_engine)[m[32m(`alien_generator`, `dialogue_generator`, `core_engine`)[m form the core asset generation [31mpipeline[m[32mpipeline, each with a distinct visual focus (procedural worlds, UI/dialogue, glitched maps).[m
+- Entry points exist in [31mai_engine, core_engine, dialogue_generator,[m[32m`ai_engine`, `core_engine`, `dialogue_generator`,[m and [31morchestrator[m[32m`orchestrator`[m for standalone [31mexecution[m[32mexecution.[m
+- No direct call chains [32mwere[m observed [31mbetween[m[32mamong[m the three focal modules in the current[31marchitecture[m graph [31m- Orchestrator appears[m[32m(they operate independently, sharing only the `_fonts` utility). However, `dialogue_generator` **does** invoke `alien_generator.generate_alien_world`[m to [31mcoordinate ai_engine[m[32mobtain background imagery, creating an indirect link.[m
+[32m- The orchestrator currently coordinates `ai_engine`[m and [31mdialogue_generator[m[32m`dialogue_generator`[m but [31mnot core_engine (based on available boundary data)[m[32mdoes **not** invoke `core_engine` or `alien_generator`; those are likely called directly via their own `main()` functions or via workflow triggers.[m
+- All image [31mprocessing[m[32mmanipulation[m is heavily [31mdependent[m[32mreliant[m on the Pillow [31mlibrary[m[32mlibrary, confirming the project’s focus on procedural and post‑processed visual assets[m for [31mimage creation[m[32mthe OffSec Terminal Forge aesthetic.[m
+
+[32m---[m
+[32m*Document generated from the live codebase memory graph (264 nodes, 485 edges) using the codebase‑memory MCP tools. Reflects the state after the recent implementation of `engines/core_engine.py`[m and [31mmanipulation[m[32mits integration.*[m

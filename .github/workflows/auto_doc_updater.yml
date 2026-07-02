@@ -1,0 +1,46 @@
+name: 📚 Auto-Update Documentation
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-docs:
+    name: 🔄 Generate & Push Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install dependencies
+        run: pip install requests
+
+      - name: 🧠 Run Documentation Updater Engine
+        env:
+          AI_Auto_Projrct_Information_Updater: ${{ secrets.AI_Auto_Projrct_Information_Updater }}
+        run: python engines/doc_updater.py
+
+      - name: 📤 Commit and Push Changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git add README.md DEVELOP.md
+          
+          if git diff --cached --quiet; then
+            echo "[*] No changes in documentation."
+          else
+            git commit -m "docs: auto-update README and DEVELOP based on latest architecture [skip ci]"
+            git push origin main
+            echo "[+] Documentation successfully updated and pushed."
+          fi
