@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   generate-ascii:
-    name: 🎨 Generate ASCII Art Asset
+    name: 🎨 Generate ASCII Art → output/ascii/
     runs-on: ubuntu-latest
 
     steps:
@@ -29,43 +29,37 @@ jobs:
       - name: 📦 Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install Pillow
-
-      # Engine readiness check — the ASCII art engine is pending implementation.
-      # This step checks if the engine exists and has real content (>200 bytes).
-      # The workflow exits cleanly if the engine is not ready yet, so it never
-      # blocks the Master Workflow's main pipeline.
-      - name: 🔍 Check ASCII engine readiness
-        id: check
-        run: |
-          ENGINE="engines/ascii_generator.py"
-          if [ -f "$ENGINE" ] && [ "$(wc -c < $ENGINE)" -gt 200 ]; then
-            echo "READY=true"  >> "$GITHUB_ENV"
-            echo "[+] ASCII engine found and ready."
-          else
-            echo "READY=false" >> "$GITHUB_ENV"
-            echo "[*] ASCII engine not yet implemented — skipping gracefully."
-          fi
+          pip install -r requirements.txt
 
       - name: 🎨 Run ascii_generator.py
-        if: env.READY == 'true'
+        # ascii_generator.py handles its own graceful fallback:
+        #   - Prefers assets/ASCII.txt (the sacred garden sanctuary)
+        #   - Falls back to built-in cyberpunk banner if file is missing
+        #   - Always produces output/ascii/ascii_art_{ts}.txt
+        #   - Always updates output/ascii/latest_ascii.txt
         run: python engines/ascii_generator.py
 
-      - name: 📤 Commit ASCII output to main
-        if: env.READY == 'true'
+      - name: 🔍 Verify ASCII output was created
+        run: |
+          COUNT=$(find output/ascii -name "ascii_art_*.txt" -type f 2>/dev/null | wc -l | tr -d ' ')
+          echo "[*] ASCII files in output/ascii/: $COUNT"
+          if [ "$COUNT" -eq 0 ]; then
+            echo "[!] No ASCII output found — ascii_generator.py may have failed."
+            exit 1
+          fi
+          echo "[+] Latest output:"
+          cat output/ascii/latest_ascii.txt | head -20
+
+      - name: 📤 Commit output/ascii/ to main
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git pull --rebase origin main
-          git add -f output/ascii/ 2>/dev/null || git add -f output/
+          git add -f output/ascii/
           if git diff --cached --quiet; then
-            echo "[*] Nothing new to commit."
+            echo "[*] Nothing new to commit in output/ascii/."
           else
             git commit -m "🎨 auto: generated ASCII art asset [skip ci]"
             git push origin main
-            echo "[+] ASCII output pushed to main."
+            echo "[+] output/ascii/ pushed to main."
           fi
-
-      - name: ⏭️ Engine pending — skipped
-        if: env.READY == 'false'
-        run: echo "[*] ASCII Art Generator is pending implementation. Add engines/ascii_generator.py to activate."

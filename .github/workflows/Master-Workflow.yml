@@ -1,12 +1,8 @@
 name: 🧠 Master Workflow (State Controller)
 
-# ── Triggers ───────────────────────────────────────────────────────────────────
 on:
-  # Run 3x per day at evenly spaced intervals (08:00, 16:00, 00:00 UTC)
   schedule:
-    - cron: '0 8,16,0 * * *'
-
-  # Manual trigger for testing or forced full runs
+    - cron: '0 8,16,0 * * *'   # 08:00, 16:00, 00:00 UTC — 3× per day
   workflow_dispatch:
 
 permissions:
@@ -14,19 +10,9 @@ permissions:
   pull-requests: write
   actions: read
 
-# ── Jobs ───────────────────────────────────────────────────────────────────────
 jobs:
 
-  # ── JOB 1: Count all assets and decide what needs to run ─────────────────────
-  # This is the "brain" of the system.
-  # Logic (mirrors the pipeline: maps → scripts → dialogues):
-  #   • run_maps     = maps  ≤ scripts   (maps are behind or equal — generate one)
-  #   • run_ai       = maps  > scripts   (scripts are behind maps  — catch up)
-  #                    OR scripts == 0   (first ever run)
-  #   • run_dialogue = scripts > dialogues (dialogues are behind scripts — render)
-  #                    OR dialogues == 0  (first ever run)
-  # This creates a natural rotation: each run advances one or two stages,
-  # keeping the three asset counts balanced over time.
+  # ── JOB 1: Count assets, decide which engines need to run ─────────────────
   analyze-state:
     name: 📊 Analyze Asset State
     runs-on: ubuntu-latest
@@ -37,78 +23,79 @@ jobs:
       run_ai:       ${{ steps.count.outputs.run_ai }}
       run_dialogue: ${{ steps.count.outputs.run_dialogue }}
       run_core:     ${{ steps.count.outputs.run_core }}
+      run_ascii:    ${{ steps.count.outputs.run_ascii }}
       maps:         ${{ steps.count.outputs.maps }}
       scripts:      ${{ steps.count.outputs.scripts }}
       dialogues:    ${{ steps.count.outputs.dialogues }}
+      ascii:        ${{ steps.count.outputs.ascii }}
 
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
           token: ${{ secrets.GH_PAT }}
 
-      - name: 📊 Count assets and set decision outputs
+      - name: 📊 Count assets and set run decisions
         id: count
         run: |
-          # Count only real generated files — exclude fixed-name "latest_*" copies
-          MAPS=$(find output/maps      -name "alien_sector_*.webp" -type f 2>/dev/null | wc -l | tr -d ' ')
-          SCRIPTS=$(find output/scripts -name "script_*.json"       -type f 2>/dev/null | wc -l | tr -d ' ')
+          MAPS=$(find output/maps      -name "alien_sector_*.webp"  -type f 2>/dev/null | wc -l | tr -d ' ')
+          SCRIPTS=$(find output/scripts -name "script_*.json"        -type f 2>/dev/null | wc -l | tr -d ' ')
           DIALOGUES=$(find output/dialogues -name "dialogue_seq_*.webp" -type f 2>/dev/null | wc -l | tr -d ' ')
-          BASE_MAP_EXISTS=$( [ -f "assets/map.png" ] && echo "true" || echo "false" )
+          ASCII=$(find output/ascii    -name "ascii_art_*.txt"       -type f 2>/dev/null | wc -l | tr -d ' ')
+          BASE_MAP=$( [ -f "assets/map.png" ] && echo "true" || echo "false" )
 
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "  📂 Asset State Report"
-          echo "  Maps       : $MAPS"
-          echo "  Scripts    : $SCRIPTS"
-          echo "  Dialogues  : $DIALOGUES"
-          echo "  assets/map.png : $BASE_MAP_EXISTS"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  📂 Current asset counts"
+          echo "  Maps       : $MAPS   (output/maps/alien_sector_*.webp)"
+          echo "  Scripts    : $SCRIPTS  (output/scripts/script_*.json)"
+          echo "  Dialogues  : $DIALOGUES (output/dialogues/dialogue_seq_*.webp)"
+          echo "  ASCII art  : $ASCII  (output/ascii/ascii_art_*.txt)"
+          echo "  assets/map.png : $BASE_MAP"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-          # ── Decision logic ────────────────────────────────────────────────
-          RUN_MAPS="false"
-          RUN_AI="false"
-          RUN_DIALOGUE="false"
-          RUN_CORE="false"
+          # ── Decision logic ─────────────────────────────────────────────────
+          # Maps: generate when maps ≤ scripts (maps need to lead or match)
+          [ "$MAPS" -le "$SCRIPTS" ]  && RUN_MAPS="true"  || RUN_MAPS="false"
 
-          # Maps: generate when maps count ≤ scripts count
-          # (need a fresh map to stay ahead of or equal to scripts)
-          if [ "$MAPS" -le "$SCRIPTS" ]; then
-            RUN_MAPS="true"
-          fi
-
-          # AI engine: generate when scripts == 0 OR maps have outpaced scripts
+          # AI engine: generate when scripts == 0 OR maps are ahead
           if [ "$SCRIPTS" -eq 0 ] || [ "$MAPS" -gt "$SCRIPTS" ]; then
             RUN_AI="true"
+          else
+            RUN_AI="false"
           fi
 
-          # Dialogue: render when dialogues == 0 OR scripts have outpaced dialogues
+          # Dialogue: render when dialogues == 0 OR scripts are ahead
           if [ "$DIALOGUES" -eq 0 ] || [ "$SCRIPTS" -gt "$DIALOGUES" ]; then
             RUN_DIALOGUE="true"
+          else
+            RUN_DIALOGUE="false"
           fi
 
           # Core engine: run when base map asset exists
-          if [ "$BASE_MAP_EXISTS" = "true" ]; then
-            RUN_CORE="true"
-          fi
+          [ "$BASE_MAP" = "true" ] && RUN_CORE="true" || RUN_CORE="false"
 
-          echo "  ─────────────────────────────────────────"
+          # ASCII: always run (engine handles its own fallback)
+          RUN_ASCII="true"
+
+          echo "  ───────────────────────────────────────────────"
           echo "  🔵 run_maps     : $RUN_MAPS"
           echo "  🟣 run_ai       : $RUN_AI"
           echo "  🟢 run_dialogue : $RUN_DIALOGUE"
           echo "  ⚙️  run_core     : $RUN_CORE"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  🎨 run_ascii    : $RUN_ASCII"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-          # Write outputs
-          echo "run_maps=$RUN_MAPS"     >> "$GITHUB_OUTPUT"
-          echo "run_ai=$RUN_AI"         >> "$GITHUB_OUTPUT"
+          echo "run_maps=$RUN_MAPS"         >> "$GITHUB_OUTPUT"
+          echo "run_ai=$RUN_AI"             >> "$GITHUB_OUTPUT"
           echo "run_dialogue=$RUN_DIALOGUE" >> "$GITHUB_OUTPUT"
-          echo "run_core=$RUN_CORE"     >> "$GITHUB_OUTPUT"
-          echo "maps=$MAPS"             >> "$GITHUB_OUTPUT"
-          echo "scripts=$SCRIPTS"       >> "$GITHUB_OUTPUT"
-          echo "dialogues=$DIALOGUES"   >> "$GITHUB_OUTPUT"
+          echo "run_core=$RUN_CORE"         >> "$GITHUB_OUTPUT"
+          echo "run_ascii=$RUN_ASCII"       >> "$GITHUB_OUTPUT"
+          echo "maps=$MAPS"                 >> "$GITHUB_OUTPUT"
+          echo "scripts=$SCRIPTS"           >> "$GITHUB_OUTPUT"
+          echo "dialogues=$DIALOGUES"       >> "$GITHUB_OUTPUT"
+          echo "ascii=$ASCII"               >> "$GITHUB_OUTPUT"
 
-  # ── JOB 2: Generate alien map (conditional) ───────────────────────────────
+  # ── JOB 2: Generate alien map ─────────────────────────────────────────────
   generate-maps:
     name: 🌍 Alien Maps Generator
     needs: analyze-state
@@ -116,9 +103,8 @@ jobs:
     uses: ./.github/workflows/Alien-Maps-Generator.yml
     secrets: inherit
 
-  # ── JOB 3: Run AI engine to produce dialogue script (conditional) ──────────
-  # Only runs AFTER generate-maps completes (success or skipped — not failed).
-  # This guarantees a fresh map always exists before scripts are generated.
+  # ── JOB 3: Generate AI dialogue script ────────────────────────────────────
+  # Sequential: waits for maps (success or skipped), then runs.
   generate-scripts:
     name: 🧠 AI Engine Workflow
     needs: [analyze-state, generate-maps]
@@ -130,9 +116,8 @@ jobs:
     uses: ./.github/workflows/AI-Engine-Workflow.yml
     secrets: inherit
 
-  # ── JOB 4: Render dialogue script → animated WebP (conditional) ────────────
-  # Only runs AFTER generate-scripts completes (success or skipped).
-  # This guarantees a fresh script always exists before rendering begins.
+  # ── JOB 4: Render dialogue → animated WebP ────────────────────────────────
+  # Sequential: waits for scripts (success or skipped), then runs.
   render-dialogues:
     name: 🎬 Orchestrator (Render)
     needs: [analyze-state, generate-maps, generate-scripts]
@@ -145,10 +130,7 @@ jobs:
     uses: ./.github/workflows/Orchestrator.yml
     secrets: inherit
 
-  # ── JOB 5: Core engine / glitch effects (independent, parallel) ────────────
-  # Runs independently of the map→script→dialogue chain since it uses its own
-  # input (assets/map.png) and produces its own output (glitched_map_*.webp).
-  # Does NOT block or depend on the main pipeline.
+  # ── JOB 5: Core engine glitch effects (parallel, independent) ─────────────
   compile-core:
     name: ⚙️ Core Engine (The Compilor)
     needs: analyze-state
@@ -156,38 +138,36 @@ jobs:
     uses: ./.github/workflows/Core_Engine_The-Compilor.yml
     secrets: inherit
 
-  # ── JOB 6: ASCII Art Generator (independent, parallel) ────────────────────
-  # Pending implementation — runs when engines/ascii_generator.py exists.
-  # Graceful skip if the engine is not ready yet.
+  # ── JOB 6: ASCII art generator (parallel, always runs) ────────────────────
   generate-ascii:
     name: 🎨 ASCII Art Generator
     needs: analyze-state
-    if: always() && needs.analyze-state.result == 'success'
+    if: needs.analyze-state.outputs.run_ascii == 'true'
     uses: ./.github/workflows/ACSII-Art-Generator.yml
     secrets: inherit
 
-  # ── JOB 7: Final summary ───────────────────────────────────────────────────
+  # ── JOB 7: Pipeline summary ───────────────────────────────────────────────
   summary:
     name: 📋 Pipeline Summary
     needs: [analyze-state, generate-maps, generate-scripts, render-dialogues, compile-core, generate-ascii]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: 📋 Print pipeline results
+      - name: 📋 Print results
         run: |
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "  🧠 Master Workflow — Pipeline Summary"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "  State analysis : ${{ needs.analyze-state.result }}"
-          echo "  Maps           : ${{ needs.generate-maps.result }}"
-          echo "  Scripts (AI)   : ${{ needs.generate-scripts.result }}"
-          echo "  Dialogues      : ${{ needs.render-dialogues.result }}"
-          echo "  Core Engine    : ${{ needs.compile-core.result }}"
-          echo "  ASCII Art      : ${{ needs.generate-ascii.result }}"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  analyze-state    : ${{ needs.analyze-state.result }}"
+          echo "  generate-maps    : ${{ needs.generate-maps.result }}"
+          echo "  generate-scripts : ${{ needs.generate-scripts.result }}"
+          echo "  render-dialogues : ${{ needs.render-dialogues.result }}"
+          echo "  compile-core     : ${{ needs.compile-core.result }}"
+          echo "  generate-ascii   : ${{ needs.generate-ascii.result }}"
+          echo "  ───────────────────────────────────────────────"
           echo "  Asset counts before this run:"
           echo "  Maps      : ${{ needs.analyze-state.outputs.maps }}"
           echo "  Scripts   : ${{ needs.analyze-state.outputs.scripts }}"
           echo "  Dialogues : ${{ needs.analyze-state.outputs.dialogues }}"
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  ASCII     : ${{ needs.analyze-state.outputs.ascii }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
