@@ -1,0 +1,45 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "ZETA-T-01",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-53",
+      "text": "Exfiltrate payload",
+      "align": "right"
+    },
+    {
+      "user": "ZETA-T-01",
+      "text": "Zero-day exploit",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-53",
+      "text": "Hack the Gibson",
+      "align": "right"
+    },
+    {
+      "user": "ZETA-T-01",
+      "text": "Like Butch Cassidy",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-53",
+      "text": "Sundown heists",
+      "align": "right"
+    },
+    {
+      "user": "ZETA-T-01",
+      "text": "Digital anarchs",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-53",
+      "text": "Ghosting systems",
+      "align": "right"
+    }
+  ]
+}
