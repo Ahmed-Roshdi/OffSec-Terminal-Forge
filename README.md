@@ -112,8 +112,8 @@ OffSec-Terminal-Forge/
 
 | Secret | Environment | Purpose |
 |--------|-------------|---------|
-| `GROQ_API_KEY` | `Dialogue_Generator-AI` | Llama 3.3 70B via Groq |
-| `GH_PAT` | `Dialogue_Generator-AI` | Push branches + auto-merge PRs |
+| `` | `Dialogue_Generator-AI` | Llama 3.3 70B via Groq |
+| `` | `Dialogue_Generator-AI` | Push branches + auto-merge PRs |
 
 ---
 
