@@ -1,0 +1,71 @@
+name: 🎨 ASCII Art Generator
+
+on:
+  workflow_call:
+    secrets:
+      GH_PAT:
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  generate-ascii:
+    name: 🎨 Generate ASCII Art Asset
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+
+      - name: 🐍 Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install Pillow
+
+      # Engine readiness check — the ASCII art engine is pending implementation.
+      # This step checks if the engine exists and has real content (>200 bytes).
+      # The workflow exits cleanly if the engine is not ready yet, so it never
+      # blocks the Master Workflow's main pipeline.
+      - name: 🔍 Check ASCII engine readiness
+        id: check
+        run: |
+          ENGINE="engines/ascii_generator.py"
+          if [ -f "$ENGINE" ] && [ "$(wc -c < $ENGINE)" -gt 200 ]; then
+            echo "READY=true"  >> "$GITHUB_ENV"
+            echo "[+] ASCII engine found and ready."
+          else
+            echo "READY=false" >> "$GITHUB_ENV"
+            echo "[*] ASCII engine not yet implemented — skipping gracefully."
+          fi
+
+      - name: 🎨 Run ascii_generator.py
+        if: env.READY == 'true'
+        run: python engines/ascii_generator.py
+
+      - name: 📤 Commit ASCII output to main
+        if: env.READY == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          git add -f output/ascii/ 2>/dev/null || git add -f output/
+          if git diff --cached --quiet; then
+            echo "[*] Nothing new to commit."
+          else
+            git commit -m "🎨 auto: generated ASCII art asset [skip ci]"
+            git push origin main
+            echo "[+] ASCII output pushed to main."
+          fi
+
+      - name: ⏭️ Engine pending — skipped
+        if: env.READY == 'false'
+        run: echo "[*] ASCII Art Generator is pending implementation. Add engines/ascii_generator.py to activate."

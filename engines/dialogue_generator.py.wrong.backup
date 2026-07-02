@@ -1,0 +1,242 @@
+#!/usr/bin/env python3
+"""
+engines/dialogue_generator.py
+Dialogue Renderer — converts JSON dialogue scripts to visual WebP images.
+
+Architecture (script / render decoupling):
+  ai_engine.py  →  writes  output/scripts/script_{ts}_{i}_{uuid}.json
+  dialogue_generator.py  →  reads   output/scripts/script_*.json
+                           →  writes output/dialogues/dialogue_seq_{name}.webp
+
+This module ONLY renders dialogue images. It never touches output/scripts/.
+That separation is intentional — it lets the render engine fail, retry, or be
+re-run independently without re-calling the Groq API.
+"""
+import json
+import os
+import re
+from datetime import datetime
+from typing import Dict, List, Tuple
+
+from PIL import Image, ImageDraw, ImageFont
+
+from _fonts import load_fonts
+
+# ── Paths ──────────────────────────────────────────────────────────────────────
+BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SCRIPTS_DIR = os.path.join(BASE_DIR, "output", "scripts")
+DIALOGUES_DIR = os.path.join(BASE_DIR, "output", "dialogues")
+os.makedirs(DIALOGUES_DIR, exist_ok=True)
+
+# ── Image configuration ────────────────────────────────────────────────────────
+# Based on observed output dimensions from existing .webp files
+IMAGE_WIDTH = 800
+IMAGE_HEIGHT = 600
+BACKGROUND_COLOR = (13, 17, 23)  # Dark background matching alien_generator
+TEXT_PADDING = 40
+LINE_SPACING = 10
+MARGIN_LEFT_RIGHT = 60
+
+def _extract_timestamp_from_filename(filename: str) -> str:
+    """Extract timestamp from script filename like script_20260630T155848Z_01_adb0b6d5.json"""
+    # Format: script_{timestamp}_{index}_{short_uuid}.json
+    match = re.search(r'script_(\d{8}T\d{6}Z)_\d{2}_[a-f0-9]{8}\.json', filename)
+    if match:
+        return match.group(1)
+    # Fallback to current time if pattern doesn't match
+    return datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+
+def _wrap_text(text: str, font: ImageFont.FreeTypeFont, max_width: int) -> List[str]:
+    """Wrap text to fit within max_width pixels."""
+    words = text.split()
+    lines = []
+    current_line = []
+    
+    for word in words:
+        test_line = ' '.join(current_line + [word])
+        bbox = font.getbbox(test_line)
+        text_width = bbox[2] - bbox[0]
+        
+        if text_width <= max_width:
+            current_line.append(word)
+        else:
+            if current_line:
+                lines.append(' '.join(current_line))
+                current_line = [word]
+            else:
+                # Word is too long, force it
+                lines.append(word)
+                current_line = []
+    
+    if current_line:
+        lines.append(' '.join(current_line))
+    
+    return lines
+
+def _render_dialogue_image(script_data: Dict, output_path: str) -> None:
+    """Render a dialogue script as an image with robot avatars and text."""
+    # Create base image
+    img = Image.new("RGB", (IMAGE_WIDTH, IMAGE_HEIGHT), color=BACKGROUND_COLOR)
+    draw = ImageDraw.Draw(img)
+    
+    # Load fonts
+    fonts = load_fonts({"robot_name": 24, "dialogue": 20, "title": 28})
+    robot_name_font = fonts["robot_name"]
+    dialogue_font = fonts["dialogue"]
+    title_font = fonts["title"]
+    
+    # Draw title if present
+    title = script_data.get("title", "")
+    if title:
+        title_bbox = title_font.getbbox(title)
+        title_width = title_bbox[2] - title_bbox[0]
+        title_x = (IMAGE_WIDTH - title_width) // 2
+        title_y = 20
+        draw.text((title_x, title_y), title, fill=(255, 255, 255), font=title_font)
+    
+    # Process each dialogue line
+    script_lines = script_data.get("script", [])
+    if not script_lines:
+        # No dialogue lines, just save empty image
+        img.save(output_path, format="WEBP", lossless=True, quality=100)
+        return
+    
+    # Calculate layout
+    start_y = 80 if title else 40
+    line_height = 30  # Approximate line height
+    
+    # Draw each dialogue line
+    y_offset = start_y
+    for line_data in script_lines:
+        user = line_data.get("user", "UNKNOWN")
+        text = line_data.get("text", "")
+        align = line_data.get("align", "left")  # left or right
+        
+        # Determine colors based on alignment
+        if align == "left":
+            # Left-aligned robot (blue-ish)
+            robot_color = (0, 255, 255)  # Cyan
+            text_color = (255, 255, 255)  # White
+            robot_x = MARGIN_LEFT_RIGHT_LEFT_RIGHT_LEFT
+        else:
+            # Right-aligned robot (pink-ish)
+            robot_color = (255, 0, 255)  # Magenta
+            text_color = (255, 255, 255)  # White
+            robot_x = IMAGE_WIDTH - MARGIN_RIGHT_LEFT - 80  # 80px for robot avatar
+        
+        # Draw robot avatar (simple circle)
+        robot_radius = 20
+        robot_y = y_offset + robot_radius
+        draw.ellipse([
+            robot_x - robot_radius,
+            robot_y - robot_radius,
+            robot_x + robot_radius,
+            robot_y + robot_radius
+        ], fill=robot_color)
+        
+        # Draw robot name
+        name_bbox = robot_name_font.getbbox(user)
+        name_width = name_bbox[2] - name_bbox[0]
+        name_x = robot_x - name_width // 2
+        name_y = robot_y + robot_radius + 5
+        draw.text((name_x, name_y), user, fill=(200, 200, 200), font=robot_name_font)
+        
+        # Draw dialogue text
+        max_text_width = IMAGE_WIDTH - 2 * MARGIN_LEFT_RIGHT - 100  # Space for robot avatars
+        wrapped_lines = _wrap_text(text, dialogue_font, max_text_width)
+        
+        text_x = robot_x + (40 if align == "left" else -40)  # Offset from robot
+        if align == "right":
+            # For right-aligned, we need to right-align the text block
+            # Calculate width of longest line
+            max_line_width = 0
+            for line in wrapped_lines:
+                line_bbox = dialogue_font.getbbox(line)
+                line_width = line_bbox[2] - line_bbox[0]
+                max_line_width = max(max_line_width, line_width)
+            
+            text_x = robot_x - 40 - max_line_width  # Position to the left of robot
+        
+        text_y = y_offset + 5
+        for line in wrapped_lines:
+            draw.text((text_x, text_y), line, fill=text_color, font=dialogue_font)
+            text_y += line_height
+        
+        # Move to next line position
+        y_offset += line_height * (len(wrapped_lines) + 1)  # +1 for spacing
+        
+        # Check if we're running out of vertical space
+        if y_offset > IMAGE_HEIGHT - 40:
+            break
+    
+    # Save the image
+    img.save(output_path, format="WEBP", lossless=True, quality=100)
+    print(f"[+] Rendered dialogue image: {output_path}")
+
+def render_dialogues() -> List[str]:
+    """Render all JSON script files to dialogue images.
+    
+    Returns:
+        List of created file paths.
+    """
+    if not os.path.exists(SCRIPTS_DIR):
+        print(f"[!] Scripts directory not found: {SCRIPTS_DIR}")
+        return []
+    
+    # Find all JSON script files
+    script_files = []
+    for f in os.listdir(SCRIPTS_DIR):
+        if f.endswith('.json') and f.startswith('script_'):
+            script_files.append(os.path.join(SCRIPTS_DIR, f))
+    
+    if not script_files:
+        print(f"[!] No script files found in {SCRIPTS_DIR}")
+        return []
+    
+    print(f"[*] Found {len(script_files)} script file(s) to render")
+    
+    created_files = []
+    for script_path in script_files:
+        try:
+            # Load script data
+            with open(script_path, 'r', encoding='utf-8') as f:
+                script_data = json.load(f)
+            
+            # Generate output filename
+            # Extract timestamp from input filename to match pairs
+            input_filename = os.path.basename(script_path)
+            timestamp = _extract_timestamp_from_filename(input_filename)
+            
+            # Use a simple counter for multiple files with same timestamp
+            base_name = f"dialogue_seq_{timestamp}"
+            counter = 1
+            output_filename = f"{base_name}.webp"
+            output_path = os.path.join(DIALOGUES_DIR, output_filename)
+            
+            # Avoid overwriting existing files
+            while os.path.exists(output_path):
+                output_filename = f"{base_name}_{counter:03d}.webp"
+                output_path = os.path.join(DIALOGUES_DIR, output_filename)
+                counter += 1
+            
+            # Render the image
+            _render_dialogue_image(script_data, output_path)
+            created_files.append(output_path)
+            
+        except Exception as e:
+            print(f"[!] Error processing {script_path}: {e}")
+    
+    print(f"[+] Rendered {len(created_files)} dialogue image(s)")
+    return created_files
+
+def main() -> None:
+    """Main entry point for dialogue generation."""
+    print("[*] Starting Dialogue Generator...")
+    created = render_dialogues()
+    if created:
+        print(f"[+] Dialogue generation complete. Created {len(created)} image(s).")
+    else:
+        print("[!] No dialogue images were created.")
+
+if __name__ == "__main__":
+    main()

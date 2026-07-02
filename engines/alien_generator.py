@@ -10,9 +10,18 @@ Output:
 import os
 import random
 import shutil
+import sys
 import time
 
 from PIL import Image, ImageDraw, ImageEnhance
+
+# ── sys.path guard ──────────────────────────────────────────────────────────
+# Python 3.11+ on CI (PYTHONSAFEPATH=1) does not auto-add the script's own
+# directory to sys.path when invoked as `python engines/alien_generator.py`.
+# This guard ensures _fonts is importable regardless of how we are called.
+_ENGINES_DIR = os.path.dirname(os.path.abspath(__file__))
+if _ENGINES_DIR not in sys.path:
+    sys.path.insert(0, _ENGINES_DIR)
 
 from _fonts import load_fonts
 

@@ -1,223 +1,193 @@
-name: 🧠 Workflow-Output (AI Generator)
+name: 🧠 Master Workflow (State Controller)
 
+# ── Triggers ───────────────────────────────────────────────────────────────────
 on:
+  # Run 3x per day at evenly spaced intervals (08:00, 16:00, 00:00 UTC)
+  schedule:
+    - cron: '0 8,16,0 * * *'
+
+  # Manual trigger for testing or forced full runs
   workflow_dispatch:
 
 permissions:
   contents: write
   pull-requests: write
+  actions: read
 
-concurrency:
-  group: ai-generator
-  cancel-in-progress: true
-
+# ── Jobs ───────────────────────────────────────────────────────────────────────
 jobs:
-  generate-and-merge:
-    name: 🚀 Generate Cyberpunk Assets → Push → Merge to Main
+
+  # ── JOB 1: Count all assets and decide what needs to run ─────────────────────
+  # This is the "brain" of the system.
+  # Logic (mirrors the pipeline: maps → scripts → dialogues):
+  #   • run_maps     = maps  ≤ scripts   (maps are behind or equal — generate one)
+  #   • run_ai       = maps  > scripts   (scripts are behind maps  — catch up)
+  #                    OR scripts == 0   (first ever run)
+  #   • run_dialogue = scripts > dialogues (dialogues are behind scripts — render)
+  #                    OR dialogues == 0  (first ever run)
+  # This creates a natural rotation: each run advances one or two stages,
+  # keeping the three asset counts balanced over time.
+  analyze-state:
+    name: 📊 Analyze Asset State
     runs-on: ubuntu-latest
     environment: Dialogue_Generator-AI
-    timeout-minutes: 30
+
+    outputs:
+      run_maps:     ${{ steps.count.outputs.run_maps }}
+      run_ai:       ${{ steps.count.outputs.run_ai }}
+      run_dialogue: ${{ steps.count.outputs.run_dialogue }}
+      run_core:     ${{ steps.count.outputs.run_core }}
+      maps:         ${{ steps.count.outputs.maps }}
+      scripts:      ${{ steps.count.outputs.scripts }}
+      dialogues:    ${{ steps.count.outputs.dialogues }}
 
     steps:
-      # ── 1. Checkout ────────────────────────────────────────────────────────
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GH_PAT }}
 
-      # ── 2. Python ──────────────────────────────────────────────────────────
-      - name: 🐍 Setup Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      # ── 3. Dependencies ────────────────────────────────────────────────────
-      - name: 📦 Install dependencies
+      - name: 📊 Count assets and set decision outputs
+        id: count
         run: |
-          python -m pip install --upgrade pip
-          pip install Pillow requests
+          # Count only real generated files — exclude fixed-name "latest_*" copies
+          MAPS=$(find output/maps      -name "alien_sector_*.webp" -type f 2>/dev/null | wc -l | tr -d ' ')
+          SCRIPTS=$(find output/scripts -name "script_*.json"       -type f 2>/dev/null | wc -l | tr -d ' ')
+          DIALOGUES=$(find output/dialogues -name "dialogue_seq_*.webp" -type f 2>/dev/null | wc -l | tr -d ' ')
+          BASE_MAP_EXISTS=$( [ -f "assets/map.png" ] && echo "true" || echo "false" )
 
-      # ── 4. Secrets check ───────────────────────────────────────────────────
-      - name: ✅ Verify secrets are present
-        env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GH_PAT: ${{ secrets.GH_PAT }}
-        run: |
-          MISSING=0
-          [ -z "$GROQ_API_KEY" ] && echo "[!] GROQ_API_KEY is missing." && MISSING=1
-          [ -z "$GH_PAT"       ] && echo "[!] GH_PAT is missing."       && MISSING=1
-          [ "$MISSING" -eq 1 ] && exit 1
-          echo "[+] All secrets loaded from Dialogue_Generator-AI."
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  📂 Asset State Report"
+          echo "  Maps       : $MAPS"
+          echo "  Scripts    : $SCRIPTS"
+          echo "  Dialogues  : $DIALOGUES"
+          echo "  assets/map.png : $BASE_MAP_EXISTS"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-      # ── 5. Diagnose Groq API key (NON-FATAL — ai_engine has a fallback) ────
-      - name: 🔑 Diagnose Groq API key
-        env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-        run: |
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "[*] Key length : ${#GROQ_API_KEY} characters"
-          echo "[*] Key prefix : ${GROQ_API_KEY:0:8}..."
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          # ── Decision logic ────────────────────────────────────────────────
+          RUN_MAPS="false"
+          RUN_AI="false"
+          RUN_DIALOGUE="false"
+          RUN_CORE="false"
 
-          if [[ "$GROQ_API_KEY" != gsk_* ]]; then
-            echo "[!] Key does not start with 'gsk_' — WRONG FORMAT"
-            echo "    → Regenerate at https://console.groq.com/keys"
-            echo "GROQ_OK=false" >> "$GITHUB_ENV"
-          else
-            echo "[+] Format OK (starts with gsk_)"
-            HTTP_STATUS=$(curl -s -o /tmp/groq_resp.json -w "%{http_code}" \
-              -X POST https://api.groq.com/openai/v1/chat/completions \
-              -H "Authorization: Bearer $GROQ_API_KEY" \
-              -H "Content-Type: application/json" \
-              -d '{"model":"llama-3.1-8b-instant","messages":[{"role":"user","content":"Reply: OK"}],"max_tokens":3}')
-
-            echo "[*] HTTP Status : $HTTP_STATUS"
-            case "$HTTP_STATUS" in
-              200) echo "[+] Groq API key VALID ✅"; echo "GROQ_OK=true" >> "$GITHUB_ENV" ;;
-              401) echo "[!] 401 Unauthorized — key INVALID."; cat /tmp/groq_resp.json; echo "GROQ_OK=false" >> "$GITHUB_ENV" ;;
-              403) echo "[!] 403 Forbidden — key REVOKED/quota EXCEEDED."; cat /tmp/groq_resp.json; echo "GROQ_OK=false" >> "$GITHUB_ENV" ;;
-              429) echo "[!] 429 Rate limited — key is valid."; echo "GROQ_OK=false" >> "$GITHUB_ENV" ;;
-              *)   echo "[!] Unexpected HTTP $HTTP_STATUS"; cat /tmp/groq_resp.json; echo "GROQ_OK=false" >> "$GITHUB_ENV" ;;
-            esac
+          # Maps: generate when maps count ≤ scripts count
+          # (need a fresh map to stay ahead of or equal to scripts)
+          if [ "$MAPS" -le "$SCRIPTS" ]; then
+            RUN_MAPS="true"
           fi
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "[*] Continuing regardless — ai_engine.py has a local fallback."
 
-      # ── 6. Generate alien map ──────────────────────────────────────────────
-      - name: 🌍 Generate alien map
-        run: python engines/alien_generator.py
+          # AI engine: generate when scripts == 0 OR maps have outpaced scripts
+          if [ "$SCRIPTS" -eq 0 ] || [ "$MAPS" -gt "$SCRIPTS" ]; then
+            RUN_AI="true"
+          fi
 
-      # ── 7. Run AI dialogue pipeline ────────────────────────────────────────
-      # orchestrator.py runs ai_engine.py then dialogue_generator.py in the
-      # SAME process, so PIPELINE_RUN_TS set by orchestrator is visible to
-      # both — this is what lets the render engine match the right script.
-      - name: 🧠 Run AI dialogue pipeline (orchestrator)
-        env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          SCENARIOS_PER_RUN: "1"
-        run: python engines/orchestrator.py
+          # Dialogue: render when dialogues == 0 OR scripts have outpaced dialogues
+          if [ "$DIALOGUES" -eq 0 ] || [ "$SCRIPTS" -gt "$DIALOGUES" ]; then
+            RUN_DIALOGUE="true"
+          fi
 
-      # ── 8. Verify output ───────────────────────────────────────────────────
-      # Checks each output subdirectory independently — scripts, maps, and
-      # dialogues — so a failure points at exactly which stage broke.
-      - name: 🔍 Verify output files were created
+          # Core engine: run when base map asset exists
+          if [ "$BASE_MAP_EXISTS" = "true" ]; then
+            RUN_CORE="true"
+          fi
+
+          echo "  ─────────────────────────────────────────"
+          echo "  🔵 run_maps     : $RUN_MAPS"
+          echo "  🟣 run_ai       : $RUN_AI"
+          echo "  🟢 run_dialogue : $RUN_DIALOGUE"
+          echo "  ⚙️  run_core     : $RUN_CORE"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+          # Write outputs
+          echo "run_maps=$RUN_MAPS"     >> "$GITHUB_OUTPUT"
+          echo "run_ai=$RUN_AI"         >> "$GITHUB_OUTPUT"
+          echo "run_dialogue=$RUN_DIALOGUE" >> "$GITHUB_OUTPUT"
+          echo "run_core=$RUN_CORE"     >> "$GITHUB_OUTPUT"
+          echo "maps=$MAPS"             >> "$GITHUB_OUTPUT"
+          echo "scripts=$SCRIPTS"       >> "$GITHUB_OUTPUT"
+          echo "dialogues=$DIALOGUES"   >> "$GITHUB_OUTPUT"
+
+  # ── JOB 2: Generate alien map (conditional) ───────────────────────────────
+  generate-maps:
+    name: 🌍 Alien Maps Generator
+    needs: analyze-state
+    if: needs.analyze-state.outputs.run_maps == 'true'
+    uses: ./.github/workflows/Alien-Maps-Generator.yml
+    secrets: inherit
+
+  # ── JOB 3: Run AI engine to produce dialogue script (conditional) ──────────
+  # Only runs AFTER generate-maps completes (success or skipped — not failed).
+  # This guarantees a fresh map always exists before scripts are generated.
+  generate-scripts:
+    name: 🧠 AI Engine Workflow
+    needs: [analyze-state, generate-maps]
+    if: |
+      always() &&
+      needs.analyze-state.result == 'success' &&
+      (needs.generate-maps.result == 'success' || needs.generate-maps.result == 'skipped') &&
+      needs.analyze-state.outputs.run_ai == 'true'
+    uses: ./.github/workflows/AI-Engine-Workflow.yml
+    secrets: inherit
+
+  # ── JOB 4: Render dialogue script → animated WebP (conditional) ────────────
+  # Only runs AFTER generate-scripts completes (success or skipped).
+  # This guarantees a fresh script always exists before rendering begins.
+  render-dialogues:
+    name: 🎬 Orchestrator (Render)
+    needs: [analyze-state, generate-maps, generate-scripts]
+    if: |
+      always() &&
+      needs.analyze-state.result == 'success' &&
+      (needs.generate-maps.result == 'success' || needs.generate-maps.result == 'skipped') &&
+      (needs.generate-scripts.result == 'success' || needs.generate-scripts.result == 'skipped') &&
+      needs.analyze-state.outputs.run_dialogue == 'true'
+    uses: ./.github/workflows/Orchestrator.yml
+    secrets: inherit
+
+  # ── JOB 5: Core engine / glitch effects (independent, parallel) ────────────
+  # Runs independently of the map→script→dialogue chain since it uses its own
+  # input (assets/map.png) and produces its own output (glitched_map_*.webp).
+  # Does NOT block or depend on the main pipeline.
+  compile-core:
+    name: ⚙️ Core Engine (The Compilor)
+    needs: analyze-state
+    if: needs.analyze-state.outputs.run_core == 'true'
+    uses: ./.github/workflows/Core_Engine_The-Compilor.yml
+    secrets: inherit
+
+  # ── JOB 6: ASCII Art Generator (independent, parallel) ────────────────────
+  # Pending implementation — runs when engines/ascii_generator.py exists.
+  # Graceful skip if the engine is not ready yet.
+  generate-ascii:
+    name: 🎨 ASCII Art Generator
+    needs: analyze-state
+    if: always() && needs.analyze-state.result == 'success'
+    uses: ./.github/workflows/ACSII-Art-Generator.yml
+    secrets: inherit
+
+  # ── JOB 7: Final summary ───────────────────────────────────────────────────
+  summary:
+    name: 📋 Pipeline Summary
+    needs: [analyze-state, generate-maps, generate-scripts, render-dialogues, compile-core, generate-ascii]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📋 Print pipeline results
         run: |
-          echo "[*] Directory listing — output/:"
-          find output/ -type f | sort
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  🧠 Master Workflow — Pipeline Summary"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "  State analysis : ${{ needs.analyze-state.result }}"
+          echo "  Maps           : ${{ needs.generate-maps.result }}"
+          echo "  Scripts (AI)   : ${{ needs.generate-scripts.result }}"
+          echo "  Dialogues      : ${{ needs.render-dialogues.result }}"
+          echo "  Core Engine    : ${{ needs.compile-core.result }}"
+          echo "  ASCII Art      : ${{ needs.generate-ascii.result }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo ""
-
-          MAPS=$(find output/maps      -type f 2>/dev/null | wc -l)
-          SCRIPTS=$(find output/scripts -type f 2>/dev/null | wc -l)
-          DIALOGUES=$(find output/dialogues -type f 2>/dev/null | wc -l)
-
-          echo "[*] Maps      : $MAPS"
-          echo "[*] Scripts   : $SCRIPTS"
-          echo "[*] Dialogues : $DIALOGUES"
-          echo ""
-
-          FAIL=0
-          [ "$MAPS"      -eq 0 ] && echo "[!] No map files — alien_generator.py failed." && FAIL=1
-          [ "$SCRIPTS"   -eq 0 ] && echo "[!] No script files — ai_engine.py produced nothing in output/scripts/." && FAIL=1
-          [ "$DIALOGUES" -eq 0 ] && echo "[!] No dialogue files — dialogue_generator.py failed to render." && FAIL=1
-
-          if [ "$FAIL" -eq 1 ]; then
-            echo "[!] Check the orchestrator logs above for the real error."
-            exit 1
-          fi
-          echo "[+] All three output stages verified."
-
-      # ── 9. Commit & push to auto/generate-assets ──────────────────────────
-      # Explicitly stages each output subdirectory so the scripts/ folder is
-      # never silently dropped, and `-f` bypasses .gitignore on output/.
-      - name: 📤 Commit & push to auto/generate-assets
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git fetch origin main
-          git checkout -B auto/generate-assets origin/main
-
-          for dir in output/maps output/scripts output/dialogues; do
-            if [ -d "$dir" ]; then
-              git add -f "$dir"
-              echo "[+] Staged: $dir"
-            else
-              echo "[!] Skipped (not found): $dir"
-            fi
-          done
-
-          echo "[*] Staged files:"
-          git diff --cached --name-only
-
-          if git diff --cached --quiet; then
-            echo "[*] No new files — output identical to last run."
-            echo "HAS_CHANGES=false" >> "$GITHUB_ENV"
-          else
-            git commit -m "🤖 chore: auto-generated map, script & dialogue [skip ci]"
-            git push origin auto/generate-assets --force
-            echo "[+] Pushed to auto/generate-assets."
-            echo "HAS_CHANGES=true" >> "$GITHUB_ENV"
-          fi
-
-      # ── 10. Open PR via gh CLI ─────────────────────────────────────────────
-      - name: 📬 Create Pull Request → main
-        if: env.HAS_CHANGES == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
-        run: |
-          EXISTING=$(gh pr list \
-            --head auto/generate-assets \
-            --base main \
-            --state open \
-            --json number \
-            --jq '.[0].number')
-
-          if [ -n "$EXISTING" ]; then
-            echo "[*] Reusing existing open PR #$EXISTING."
-            echo "PR_NUMBER=$EXISTING" >> "$GITHUB_ENV"
-          else
-            PR_URL=$(gh pr create \
-              --base main \
-              --head auto/generate-assets \
-              --title "🤖 Automated: Add generated AI assets" \
-              --body "$(printf '## 🧠 Auto-generated Assets\n\n| Field | Value |\n|---|---|\n| Triggered | workflow_dispatch |\n| Groq API | %s |\n| Branch | auto/generate-assets → main |\n| Output | output/maps, output/scripts, output/dialogues |\n\nAuto-merged by workflow.' "${{ env.GROQ_OK }}")" \
-              --label automated)
-            PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
-            echo "[+] Created PR #$PR_NUMBER"
-            echo "PR_NUMBER=$PR_NUMBER" >> "$GITHUB_ENV"
-          fi
-
-      # ── 11. Auto-merge with retry ──────────────────────────────────────────
-      - name: 🔄 Auto-merge PR into main
-        if: env.HAS_CHANGES == 'true' && env.PR_NUMBER != ''
-        env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
-        run: |
-          PR="${{ env.PR_NUMBER }}"
-          MAX=6
-          ATTEMPT=1
-          while [ $ATTEMPT -le $MAX ]; do
-            echo "[*] Merge attempt $ATTEMPT/$MAX for PR #$PR..."
-            if gh pr merge "$PR" --merge --admin --delete-branch; then
-              echo "[+] PR #$PR merged into main ✅"
-              exit 0
-            fi
-            WAIT=$(( ATTEMPT * 8 ))
-            echo "[!] Attempt $ATTEMPT failed. Retrying in ${WAIT}s..."
-            sleep $WAIT
-            ATTEMPT=$(( ATTEMPT + 1 ))
-          done
-          echo "[!] All $MAX merge attempts failed."
-          exit 1
-
-      # ── 12. Confirm ────────────────────────────────────────────────────────
-      - name: ✅ Confirm main received the changes
-        if: env.HAS_CHANGES == 'true'
-        run: |
-          git fetch origin main
-          echo "[+] main HEAD: $(git log origin/main --oneline -1)"
-
-      - name: ⏭️ No changes — skipped
-        if: env.HAS_CHANGES == 'false'
-        run: echo "[*] Output identical to last run. No PR needed."
+          echo "  Asset counts before this run:"
+          echo "  Maps      : ${{ needs.analyze-state.outputs.maps }}"
+          echo "  Scripts   : ${{ needs.analyze-state.outputs.scripts }}"
+          echo "  Dialogues : ${{ needs.analyze-state.outputs.dialogues }}"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
