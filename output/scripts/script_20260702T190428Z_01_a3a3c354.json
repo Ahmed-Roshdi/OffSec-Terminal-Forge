@@ -1,0 +1,50 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "NOVA-R4",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-24",
+      "text": "Bypassing firewalls",
+      "align": "right"
+    },
+    {
+      "user": "NOVA-R4",
+      "text": "Payload delivered",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-24",
+      "text": "Exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "NOVA-R4",
+      "text": "Like a digital ninja",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-24",
+      "text": "Ghost in machine",
+      "align": "right"
+    },
+    {
+      "user": "NOVA-R4",
+      "text": "Hack the planet",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-24",
+      "text": "Matrix style",
+      "align": "right"
+    },
+    {
+      "user": "NOVA-R4",
+      "text": "Cyber doom",
+      "align": "left"
+    }
+  ]
+}
