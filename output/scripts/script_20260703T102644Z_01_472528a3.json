@@ -1,0 +1,50 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "VEX-71",
+      "text": "Infiltrate mainframe",
+      "align": "left"
+    },
+    {
+      "user": "NODE-K2",
+      "text": "Bypass firewalls",
+      "align": "right"
+    },
+    {
+      "user": "VEX-71",
+      "text": "Deploy zero-day payload",
+      "align": "left"
+    },
+    {
+      "user": "NODE-K2",
+      "text": "Exfiltrate sensitive data",
+      "align": "right"
+    },
+    {
+      "user": "VEX-71",
+      "text": "Like a digital ninja",
+      "align": "left"
+    },
+    {
+      "user": "NODE-K2",
+      "text": "Ghost in machine",
+      "align": "right"
+    },
+    {
+      "user": "VEX-71",
+      "text": "Hack like Beatles",
+      "align": "left"
+    },
+    {
+      "user": "NODE-K2",
+      "text": "Come together, exploit",
+      "align": "right"
+    },
+    {
+      "user": "VEX-71",
+      "text": "Ransomware payoff",
+      "align": "left"
+    }
+  ]
+}
