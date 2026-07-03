@@ -1,0 +1,45 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "CORTEX-15",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-58",
+      "text": "Exfiltrating secrets",
+      "align": "right"
+    },
+    {
+      "user": "CORTEX-15",
+      "text": "Zero-day exploit",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-58",
+      "text": "Payload delivered",
+      "align": "right"
+    },
+    {
+      "user": "CORTEX-15",
+      "text": "Like a digital ninja",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-58",
+      "text": "Sneaky, silent, deadly",
+      "align": "right"
+    },
+    {
+      "user": "CORTEX-15",
+      "text": "Ghost in machine",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-58",
+      "text": "Cyber James Bond",
+      "align": "right"
+    }
+  ]
+}
