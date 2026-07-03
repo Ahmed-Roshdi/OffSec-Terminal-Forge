@@ -1,0 +1,45 @@
+{
+  "title": "Shadow Net",
+  "script": [
+    {
+      "user": "NODE-44",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "EXO-T-01",
+      "text": "Payload deploying now",
+      "align": "right"
+    },
+    {
+      "user": "NODE-44",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "EXO-T-01",
+      "text": "Exfiltrate the data",
+      "align": "right"
+    },
+    {
+      "user": "NODE-44",
+      "text": "Like a digital ninja",
+      "align": "left"
+    },
+    {
+      "user": "EXO-T-01",
+      "text": "Silent as a ghost",
+      "align": "right"
+    },
+    {
+      "user": "NODE-44",
+      "text": "Hacking like Beatles",
+      "align": "left"
+    },
+    {
+      "user": "EXO-T-01",
+      "text": "Come together, yeah",
+      "align": "right"
+    }
+  ]
+}
