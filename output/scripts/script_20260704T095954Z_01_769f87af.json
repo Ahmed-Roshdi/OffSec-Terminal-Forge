@@ -1,0 +1,45 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "CIPHER-51",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-83",
+      "text": "Bypassing firewalls",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-51",
+      "text": "Payload deployed",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-83",
+      "text": "Exfiltrating data now",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-51",
+      "text": "Like a digital ninja",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-83",
+      "text": "Ghost in machine",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-51",
+      "text": "Hacking like Beatles",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-83",
+      "text": "Come together, bytes",
+      "align": "right"
+    }
+  ]
+}
