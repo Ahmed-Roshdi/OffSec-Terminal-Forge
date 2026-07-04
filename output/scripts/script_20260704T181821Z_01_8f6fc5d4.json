@@ -1,0 +1,50 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "ORBITER-55",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "NOVA-R4",
+      "text": "Payload deployed",
+      "align": "right"
+    },
+    {
+      "user": "ORBITER-55",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "NOVA-R4",
+      "text": "Exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "ORBITER-55",
+      "text": "Tehran hacktivists",
+      "align": "left"
+    },
+    {
+      "user": "NOVA-R4",
+      "text": "Ghosting the net",
+      "align": "right"
+    },
+    {
+      "user": "ORBITER-55",
+      "text": "Dark arts mastery",
+      "align": "left"
+    },
+    {
+      "user": "NOVA-R4",
+      "text": "Ninja mode",
+      "align": "right"
+    },
+    {
+      "user": "ORBITER-55",
+      "text": "Shadow brokers",
+      "align": "left"
+    }
+  ]
+}
