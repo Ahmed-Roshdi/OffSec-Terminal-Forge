@@ -8,11 +8,10 @@ permissions:
 
 jobs:
   update-docs:
-    name: 🔄 Generate & Push README + DEVELOP
+    name: 🔄 Generate README + DEVELOP → Output branch
     runs-on: ubuntu-latest
-
     steps:
-      - name: 📥 Checkout repository
+      - name: 📥 Checkout main (source + PROJECT_MEMORY.md)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -24,17 +23,11 @@ jobs:
           python-version: '3.11'
 
       - name: 📦 Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: 🔍 Verify PROJECT_MEMORY.md exists
         run: |
-          if [ ! -f "PROJECT_MEMORY.md" ]; then
-            echo "[!] PROJECT_MEMORY.md not found at repo root."
-            echo "    doc_updater.py requires this file for architecture context."
-            exit 1
-          fi
+          [ -f "PROJECT_MEMORY.md" ] || { echo "[!] PROJECT_MEMORY.md missing."; exit 1; }
           echo "[+] PROJECT_MEMORY.md found ($(wc -c < PROJECT_MEMORY.md) bytes)."
 
       - name: 🧠 Run doc_updater.py
@@ -42,16 +35,22 @@ jobs:
           AI_Auto_Projrct_Information_Updater: ${{ secrets.AI_Auto_Projrct_Information_Updater }}
         run: python engines/doc_updater.py
 
-      - name: 📤 Commit README.md and DEVELOP.md to main
+      - name: 📤 Push README.md + DEVELOP.md to Output branch
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin main
+          git fetch origin
+          if git ls-remote --exit-code --heads origin Output >/dev/null 2>&1; then
+            git checkout -B Output origin/Output
+          else
+            echo "[*] Creating Output branch from main."
+            git checkout -B Output
+          fi
           git add README.md DEVELOP.md
           if git diff --cached --quiet; then
-            echo "[*] Documentation unchanged — nothing to commit."
+            echo "[*] Documentation unchanged."
           else
             git commit -m "docs: auto-update README and DEVELOP [skip ci]"
-            git push origin main
-            echo "[+] Documentation pushed to main."
+            git push origin Output
+            echo "[+] README.md + DEVELOP.md → Output branch."
           fi

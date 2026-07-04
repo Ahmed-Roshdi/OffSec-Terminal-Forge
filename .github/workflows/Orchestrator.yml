@@ -1,13 +1,10 @@
 name: 🎬 Orchestrator (Dialogue Renderer)
 
 on:
-  # Called by Master-Workflow after AI-Engine-Workflow completes
   workflow_call:
     secrets:
       GH_PAT:
         required: true
-
-  # Also triggerable manually for standalone render pass
   workflow_dispatch:
 
 permissions:
@@ -18,9 +15,8 @@ jobs:
     name: 🎬 Render Script → Animated WebP
     runs-on: ubuntu-latest
     environment: Dialogue_Generator-AI
-
     steps:
-      - name: 📥 Checkout repository
+      - name: 📥 Checkout main (source)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -32,43 +28,39 @@ jobs:
           python-version: '3.11'
 
       - name: 📦 Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install Pillow
+        run: pip install -r requirements.txt
 
-      # Verify a script exists before attempting to render.
-      # dialogue_generator.py has a built-in fallback, but logging this
-      # explicitly makes it clear in the Action logs what source was used.
-      - name: 🔍 Check for script files
+      # Pull output/scripts/ from Output branch so dialogue_generator can find scripts
+      - name: 📥 Fetch scripts from Output branch
         run: |
-          COUNT=$(find output/scripts -name "script_*.json" -type f 2>/dev/null | wc -l | tr -d ' ')
-          echo "[*] Found $COUNT script file(s) in output/scripts/."
-          if [ "$COUNT" -eq 0 ]; then
-            echo "[!] No scripts found — dialogue_generator.py will use its built-in fallback dialogue."
+          git fetch origin
+          if git ls-remote --exit-code --heads origin Output >/dev/null 2>&1; then
+            git checkout origin/Output -- output/scripts/ 2>/dev/null || true
+            git checkout origin/Output -- output/maps/    2>/dev/null || true
+            echo "[+] Loaded scripts and maps from Output branch."
           else
-            LATEST=$(find output/scripts -name "script_*.json" -type f | sort | tail -1)
-            echo "[+] Will render: $(basename $LATEST)"
+            echo "[*] Output branch not yet created — no prior scripts to load."
           fi
 
-      - name: 🎬 Run dialogue_generator.py (render engine)
+      - name: 🎬 Run dialogue_generator.py
         run: python engines/dialogue_generator.py
 
-      - name: 📤 Commit output/dialogues/ to main
+      - name: 📤 Push output/dialogues/ to Output branch
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin main
+          git fetch origin
+          if git ls-remote --exit-code --heads origin Output >/dev/null 2>&1; then
+            git checkout -B Output origin/Output
+          else
+            echo "[*] Creating Output branch from main."
+            git checkout -B Output
+          fi
           git add -f output/dialogues/
           if git diff --cached --quiet; then
-            echo "[*] Nothing new to commit in output/dialogues/."
+            echo "[*] Nothing new to commit."
           else
             git commit -m "🎬 auto: rendered dialogue animation [skip ci]"
-            git push origin main
-            echo "[+] output/dialogues/ pushed to main."
+            git push origin Output
+            echo "[+] output/dialogues/ → Output branch."
           fi
-
-      - name: ✅ Confirm output
-        run: |
-          WEBP=$(find output/dialogues -name "*.webp" -type f 2>/dev/null | wc -l)
-          echo "[+] output/dialogues/ now contains $WEBP WebP file(s)."
-          ls -lh output/dialogues/ 2>/dev/null || echo "(directory not found)"

@@ -1,0 +1,32 @@
+# ===============================================================================
+# Workflow: Cross-Repository Publisher (Profile README Updater)
+# Role: Pushes the final generated assets to the user's main GitHub Profile README.
+# ===============================================================================
+#
+# OPERATIONAL DIRECTIVES & CONSTRAINTS:
+#
+# 1. Execution Order (Timing):
+#    - This workflow MUST run strictly AFTER the main generation workflow completes
+#      and successfully pushes the new assets to the `Output` branch.
+#    - Recommended trigger: `workflow_run` tied to the Master Workflow, or added 
+#      as the absolute final job in the existing pipeline.
+#
+# 2. Cross-Repository Authentication (PAT Requirement):
+#    - The default `${{ secrets.GITHUB_TOKEN }}` cannot push to a different repository.
+#    - You MUST use a Personal Access Token (e.g., `${{ secrets.PROFILE_UPDATE_PAT }}`)
+#      with full 'repo' scope.
+#    - This PAT must be used in the `actions/checkout` step when cloning the target 
+#      profile repository (Ahmed-Roshdi/Ahmed-Roshdi).
+#
+# 3. Branch Context & Asset Retrieval:
+#    - The workflow must check out the `Output` branch of THIS repository first to 
+#      allow `Publisher.py` to read the latest generated file names and paths.
+#    - Then, it checks out the target profile repository into a separate directory 
+#      to perform the Regex injection.
+#
+# 4. Safe Commit & Push (Target Repo):
+#    - Git configuration (user.name and user.email) must be explicitly set before committing.
+#    - The push operation targets the `main` branch of `Ahmed-Roshdi/Ahmed-Roshdi`.
+#    - The workflow should only proceed with the commit if `Publisher.py` successfully 
+#      modified the target README.md (check for git diff).
+# ===============================================================================

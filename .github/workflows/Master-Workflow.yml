@@ -7,17 +7,15 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
   actions: read
 
 jobs:
 
-  # ── JOB 1: Count assets, decide which engines need to run ─────────────────
+  # ── JOB 1: Count assets on Output branch, decide what runs ────────────────
   analyze-state:
     name: 📊 Analyze Asset State
     runs-on: ubuntu-latest
     environment: Dialogue_Generator-AI
-
     outputs:
       run_maps:     ${{ steps.count.outputs.run_maps }}
       run_ai:       ${{ steps.count.outputs.run_ai }}
@@ -30,34 +28,46 @@ jobs:
       ascii:        ${{ steps.count.outputs.ascii }}
 
     steps:
-      - name: 📥 Checkout repository
+      - name: 📥 Checkout main
         uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           token: ${{ secrets.GH_PAT }}
 
-      - name: 📊 Count assets and set run decisions
+      # Load the output/ tree from Output branch so we can count existing assets.
+      # output/ is gitignored on main, so we must pull it from Output.
+      - name: 📥 Load output/ counts from Output branch
+        run: |
+          git fetch origin
+          if git ls-remote --exit-code --heads origin Output >/dev/null 2>&1; then
+            git checkout origin/Output -- output/ 2>/dev/null || true
+            echo "[+] Loaded output/ from Output branch."
+          else
+            echo "[*] Output branch does not exist yet — all counts start at 0."
+          fi
+
+      - name: 📊 Count assets and set decision outputs
         id: count
         run: |
-          MAPS=$(find output/maps      -name "alien_sector_*.webp"  -type f 2>/dev/null | wc -l | tr -d ' ')
-          SCRIPTS=$(find output/scripts -name "script_*.json"        -type f 2>/dev/null | wc -l | tr -d ' ')
+          MAPS=$(find output/maps -name "alien_sector_*.webp"  -type f 2>/dev/null | wc -l | tr -d ' ')
+          SCRIPTS=$(find output/scripts -name "script_*.json"  -type f 2>/dev/null | wc -l | tr -d ' ')
           DIALOGUES=$(find output/dialogues -name "dialogue_seq_*.webp" -type f 2>/dev/null | wc -l | tr -d ' ')
-          ASCII=$(find output/ascii    -name "ascii_art_*.txt"       -type f 2>/dev/null | wc -l | tr -d ' ')
-          BASE_MAP=$( [ -f "assets/map.png" ] && echo "true" || echo "false" )
+          ASCII=$(find output/ascii -name "ascii_art_*.txt"    -type f 2>/dev/null | wc -l | tr -d ' ')
+          SVG_EXISTS=$( [ -f "assets/islamic_world_map.svg" ] && echo "true" || echo "false" )
 
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "  📂 Current asset counts"
-          echo "  Maps       : $MAPS   (output/maps/alien_sector_*.webp)"
-          echo "  Scripts    : $SCRIPTS  (output/scripts/script_*.json)"
-          echo "  Dialogues  : $DIALOGUES (output/dialogues/dialogue_seq_*.webp)"
-          echo "  ASCII art  : $ASCII  (output/ascii/ascii_art_*.txt)"
-          echo "  assets/map.png : $BASE_MAP"
+          echo "  📂 Asset state on Output branch"
+          echo "  Maps       : $MAPS"
+          echo "  Scripts    : $SCRIPTS"
+          echo "  Dialogues  : $DIALOGUES"
+          echo "  ASCII art  : $ASCII"
+          echo "  SVG map    : $SVG_EXISTS"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-          # ── Decision logic ─────────────────────────────────────────────────
-          # Maps: generate when maps ≤ scripts (maps need to lead or match)
-          [ "$MAPS" -le "$SCRIPTS" ]  && RUN_MAPS="true"  || RUN_MAPS="false"
+          # Maps: generate when maps ≤ scripts (maps need to lead or balance)
+          [ "$MAPS" -le "$SCRIPTS" ] && RUN_MAPS="true" || RUN_MAPS="false"
 
-          # AI engine: generate when scripts == 0 OR maps are ahead
+          # AI: generate when scripts == 0 OR maps are ahead
           if [ "$SCRIPTS" -eq 0 ] || [ "$MAPS" -gt "$SCRIPTS" ]; then
             RUN_AI="true"
           else
@@ -71,13 +81,10 @@ jobs:
             RUN_DIALOGUE="false"
           fi
 
-          # Core engine: run when base map asset exists
-          [ "$BASE_MAP" = "true" ] && RUN_CORE="true" || RUN_CORE="false"
-
-          # ASCII: always run (engine handles its own fallback)
+          [ "$SVG_EXISTS" = "true" ] && RUN_CORE="true" || RUN_CORE="false"
           RUN_ASCII="true"
 
-          echo "  ───────────────────────────────────────────────"
+          echo "  ─────────────────────────────────────────────"
           echo "  🔵 run_maps     : $RUN_MAPS"
           echo "  🟣 run_ai       : $RUN_AI"
           echo "  🟢 run_dialogue : $RUN_DIALOGUE"
@@ -95,7 +102,9 @@ jobs:
           echo "dialogues=$DIALOGUES"       >> "$GITHUB_OUTPUT"
           echo "ascii=$ASCII"               >> "$GITHUB_OUTPUT"
 
-  # ── JOB 2: Generate alien map ─────────────────────────────────────────────
+  # ── Sequential pipeline — each job waits for the previous ─────────────────
+  # All jobs push to Output branch. Sequential order prevents push conflicts.
+
   generate-maps:
     name: 🌍 Alien Maps Generator
     needs: analyze-state
@@ -103,8 +112,6 @@ jobs:
     uses: ./.github/workflows/Alien-Maps-Generator.yml
     secrets: inherit
 
-  # ── JOB 3: Generate AI dialogue script ────────────────────────────────────
-  # Sequential: waits for maps (success or skipped), then runs.
   generate-scripts:
     name: 🧠 AI Engine Workflow
     needs: [analyze-state, generate-maps]
@@ -116,8 +123,6 @@ jobs:
     uses: ./.github/workflows/AI-Engine-Workflow.yml
     secrets: inherit
 
-  # ── JOB 4: Render dialogue → animated WebP ────────────────────────────────
-  # Sequential: waits for scripts (success or skipped), then runs.
   render-dialogues:
     name: 🎬 Orchestrator (Render)
     needs: [analyze-state, generate-maps, generate-scripts]
@@ -130,33 +135,39 @@ jobs:
     uses: ./.github/workflows/Orchestrator.yml
     secrets: inherit
 
-  # ── JOB 5: Core engine glitch effects (parallel, independent) ─────────────
+  # Core engine after main chain — sequential to avoid Output branch conflicts
   compile-core:
     name: ⚙️ Core Engine (The Compilor)
-    needs: analyze-state
-    if: needs.analyze-state.outputs.run_core == 'true'
+    needs: [analyze-state, render-dialogues]
+    if: |
+      always() &&
+      needs.analyze-state.result == 'success' &&
+      (needs.render-dialogues.result == 'success' || needs.render-dialogues.result == 'skipped') &&
+      needs.analyze-state.outputs.run_core == 'true'
     uses: ./.github/workflows/Core_Engine_The-Compilor.yml
     secrets: inherit
 
-  # ── JOB 6: ASCII art generator (parallel, always runs) ────────────────────
+  # ASCII last in the chain — always runs (engine has its own fallback)
   generate-ascii:
     name: 🎨 ASCII Art Generator
-    needs: analyze-state
-    if: needs.analyze-state.outputs.run_ascii == 'true'
+    needs: [analyze-state, compile-core]
+    if: |
+      always() &&
+      needs.analyze-state.result == 'success' &&
+      (needs.compile-core.result == 'success' || needs.compile-core.result == 'skipped')
     uses: ./.github/workflows/ACSII-Art-Generator.yml
     secrets: inherit
 
-  # ── JOB 7: Pipeline summary ───────────────────────────────────────────────
   summary:
     name: 📋 Pipeline Summary
     needs: [analyze-state, generate-maps, generate-scripts, render-dialogues, compile-core, generate-ascii]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: 📋 Print results
+      - name: 📋 Results
         run: |
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-          echo "  🧠 Master Workflow — Pipeline Summary"
+          echo "  🧠 Master Workflow — Summary"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo "  analyze-state    : ${{ needs.analyze-state.result }}"
           echo "  generate-maps    : ${{ needs.generate-maps.result }}"
@@ -164,10 +175,7 @@ jobs:
           echo "  render-dialogues : ${{ needs.render-dialogues.result }}"
           echo "  compile-core     : ${{ needs.compile-core.result }}"
           echo "  generate-ascii   : ${{ needs.generate-ascii.result }}"
-          echo "  ───────────────────────────────────────────────"
-          echo "  Asset counts before this run:"
-          echo "  Maps      : ${{ needs.analyze-state.outputs.maps }}"
-          echo "  Scripts   : ${{ needs.analyze-state.outputs.scripts }}"
-          echo "  Dialogues : ${{ needs.analyze-state.outputs.dialogues }}"
-          echo "  ASCII     : ${{ needs.analyze-state.outputs.ascii }}"
+          echo "  ─────────────────────────────────────────────"
+          echo "  All outputs committed to → Output branch"
+          echo "  main branch unchanged    ✅"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

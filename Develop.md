@@ -1,144 +1,177 @@
-# 📋 DEVLOG — OffSec-Terminal-Forge
+<div align="center">
 
-> Development log: fixed bugs, current status, and what's next.
+# 🤖 OffSec Terminal Forge
 
----
+**A self-updating cyberpunk terminal — AI-generated alien worlds, Islamic world map animations,
+ASCII sanctuary art, and security dialogues, rebuilt automatically on every workflow run.**
 
-## ✅ Current Status
+[![Master Workflow](https://github.com/Ahmed-Roshdi/OffSec-Terminal-Forge/actions/workflows/Master-Workflow.yml/badge.svg)](https://github.com/Ahmed-Roshdi/OffSec-Terminal-Forge/actions/workflows/Master-Workflow.yml)
+![Last Commit](https://img.shields.io/github/last-commit/Ahmed-Roshdi/OffSec-Terminal-Forge/Output?color=00ffff&label=Output%20branch)
+![Model](https://img.shields.io/badge/AI-Groq%20%7C%20Llama%203.3%2070B-8a2be2)
 
-| Module | Status | Notes |
-|--------|--------|-------|
-| `alien_generator.py` | ✅ Working | Generates map + `latest_map.webp` |
-| `ai_engine.py` | ✅ Working | Groq `llama-3.3-70b-versatile` + local fallback |
-| `dialogue_generator.py` | ✅ Working | JSON → WebP + `latest_dialogue.webp` |
-| `orchestrator.py` | ✅ Working | Shares `PIPELINE_RUN_TS` across both engines |
-| `Workflow-Output.yml` | ✅ Working | Auto-PR → auto-merge to `main` |
-| `_fonts.py` | ✅ Working | Shared font resolution |
-| `core_engine.py` | 🔲 Pending | Not yet implemented |
+</div>
 
 ---
 
-## 🐛 Fixed Issues (History)
+## 🌌 Latest Alien Sector Map
 
-| # | Error | Root Cause | Fix |
-|---|-------|-----------|-----|
-| 1 | `NameError: output_path` | Dead code block at bottom of original `dialogue_generator.py` floated outside any function | Removed the broken block; moved verification inside `main()` |
-| 2 | `peter-evans` action reset branch | Action did its own `git push` after ours and force-reset `auto/generate-assets` to `main` HEAD | Replaced with `gh pr create` CLI — we control all git operations |
-| 3 | `output/` never committed | `.gitignore` silently excluded `output/` | Added `git add -f output/` (force bypasses gitignore) |
-| 4 | `GROQ_API_KEY` 403 on every call | Wrong key value stored in GitHub secret | Regenerated fresh key from `console.groq.com`; added `gsk_` prefix check |
-| 5 | `git add` before `git checkout` | Staging area state inconsistent after branch switch | Reordered: fetch → checkout from `origin/main` → `git add -f` |
-| 6 | `PIPELINE_RUN_TS` lost between steps | `os.environ` set in `ai_engine.py` process dies when the step ends; `dialogue_generator.py` runs in a new process with empty env | Use `orchestrator.py` as single entrypoint — both engines share the same process and the env var persists |
-| 7 | `dialogue_generator.py` rendered all historical JSON files | `PIPELINE_RUN_TS` was empty so the run filter had no effect | Fixed by using orchestrator (issue 6 fix) + graceful fallback to most recent file if marker not found |
-| 8 | README showed nothing | `latest_dialogue.webp` and `latest_map.webp` did not exist | Added `shutil.copy2()` at end of each render in both generators |
+<div align="center">
+<img src="https://raw.githubusercontent.com/Ahmed-Roshdi/OffSec-Terminal-Forge/Output/output/maps/latest_map.webp" width="860" alt="Latest Alien Sector Map" />
+</div>
 
 ---
 
-## 🏗️ Architecture Change — Script/Render Decoupling
+## 💬 Latest AI Dialogue Sequence
 
-**Problem:** `ai_engine.py` wrote dialogue JSON directly into `output/dialogues/`
-— the same folder the renderer wrote its final WebP output into. Any mismatch
-in the glob pattern, filename timing, or `PIPELINE_RUN_TS` value caused the
-render engine to find zero matching files and silently fall through to the
-built-in fallback dialogue, with no clear signal in the logs about which
-stage actually failed.
-
-**Fix:** Split into two distinct directories with one engine each:
-
-| Stage | Engine | Writes to |
-|-------|--------|-----------|
-| Script generation | `ai_engine.py` | `output/scripts/script_{ts}_{i}_{uuid}.json` |
-| Rendering | `dialogue_generator.py` | `output/dialogues/dialogue_seq_{name}.webp` |
-
-`ai_engine.py` now **only** produces script data — it never touches
-`output/dialogues/`. `dialogue_generator.py` reads exactly **one** script
-file per run (the most recent one matching `PIPELINE_RUN_TS`, falling back
-to the most recent script overall, falling back to the built-in dialogue
-pool only if `output/scripts/` is completely empty).
-
-Filenames use a timestamp prefix (`script_20260630T120000Z_01_a1b2c3d4.json`)
-so a plain `sorted(glob.glob(...))` is already in chronological order — no
-extra sort key needed.
-
-**Workflow change:** the verify step (Step 8) now checks `output/maps`,
-`output/scripts`, and `output/dialogues` independently and reports exactly
-which stage produced zero files. The commit step (Step 9) stages each of
-the three directories explicitly with `git add -f`, rather than relying on
-a single `git add -f output/` to catch everything.
+<div align="center">
+<img src="https://raw.githubusercontent.com/Ahmed-Roshdi/OffSec-Terminal-Forge/Output/output/dialogues/latest_dialogue.webp" width="860" alt="Latest AI Dialogue" />
+</div>
 
 ---
 
-## 📋 TODO
+## 🗺️ Latest Islamic World Map (Glitch)
 
-### 🔴 High Priority
-
-- [ ] **`core_engine.py`** — Earth map processor + visual glitch effects (Phase 3)
-- [ ] **Scheduled trigger** — Add `schedule: cron: '0 6 * * *'` to run daily automatically
-- [ ] **`AI_REQUEST` env var** — Pass theme/context from workflow to vary dialogue topics per run
-
-### 🟡 Medium Priority
-
-- [ ] **Multi-scenario per CI run** — Set `SCENARIOS_PER_RUN: "3"` in workflow for richer output
-- [ ] **GitLab CI mirror** — Add `.gitlab-ci.yml` to mirror the pipeline on GitLab
-- [ ] **README auto-refresh badge** — Add `last updated` timestamp badge that reflects actual last run time
-- [ ] **earth_glitch maps** — Implement in `core_engine.py` as alternative background type
-
-### 🟢 Low Priority
-
-- [ ] **ASCII garden animation** — Original Phase 0: integrate the terminal-rendered garden drawing
-- [ ] **Dialogue themes rotation** — Randomize the `AI_REQUEST` from a predefined theme list each run
-- [ ] **Output archiving** — Keep last N runs; prune older files to avoid repo bloat
-- [ ] **Artifact upload** — Upload WebP files as GitHub Actions artifacts for download without committing
+<div align="center">
+<img src="https://raw.githubusercontent.com/Ahmed-Roshdi/OffSec-Terminal-Forge/Output/output/maps/latest_glitch.webp" width="860" alt="Islamic World Map Glitch" />
+</div>
 
 ---
 
-## 🏗️ Architecture Notes
+## 📐 Visual Benchmark — Gold Standard
 
-### Why `orchestrator.py` instead of separate workflow steps?
+The file `output/Old-Standerd-Of-Final-Output/magic_readme.webp` is the
+**definitive visual reference** for this project. All rendering engines are
+validated against it.
 
-`PIPELINE_RUN_TS` is a timestamp used to match JSON files created by `ai_engine.py` with the
-render pass in `dialogue_generator.py`. When called as separate workflow steps, each step runs
-in its own shell process. `os.environ["PIPELINE_RUN_TS"] = ts` in `ai_engine.py` only sets the
-variable in that process — it disappears when the step ends. `dialogue_generator.py` then sees
-an empty `PIPELINE_RUN_TS` and falls back to rendering all historical JSON files.
+### Programmatic Analysis Results
 
-`orchestrator.py` fixes this by running both engines in the **same Python process**, so the
-`os.environ` mutation persists across both function calls.
+The following parameters were extracted by running a pixel-level analysis
+script on `magic_readme.webp`:
 
-### Why `git add -f output/`?
+| Parameter | Value | Hex |
+|-----------|-------|-----|
+| Canvas size | 2428 × 1136 px | — |
+| Total frames | 66 (animated WebP) | — |
+| Background RGB | (13, 17, 23) | `#0d1117` |
+| Gray text RGB | (139, 148, 158) | `#8b949e` |
+| Green accent RGB | (39, 174, 96) | `#27ae60` |
+| OffSec cyan RGB | (0, 212, 255) | `#00d4ff` |
+| OffSec purple RGB | (140, 30, 255) | `#8c1eff` |
+| Glitch red RGB | (231, 76, 60) | `#e74c3c` |
+| Background coverage | 91.0% of pixels | — |
+| Foreground coverage | 9.0% of pixels | — |
 
-`output/` is in `.gitignore` for local development (you don't want generated files cluttering
-`git status`). On the CI runner, we want to commit these files to remote. The `-f` flag forces
-git to stage files that would otherwise be excluded by `.gitignore`. This is intentional and
-correct — it's the standard pattern for "ignore locally, track remotely."
+### Critical Finding — Previous Glitch Implementation Was Incorrect
 
-### Why `gh pr create` instead of `peter-evans/create-pull-request@v6`?
+> **⚠️ The glitch effect previously implemented by Claude in `core_engine.py`
+> (RGB channel pixel splitting, numpy scanlines, pixel-sort by HSV) was
+> architecturally wrong and does not exist in the gold standard output.**
 
-The action does its own internal git operations after our manual `git push`. It re-fetches the
-branch, compares it against `main`, and if it decides the branch "already matches" main (which
-can happen when it rebases internally), it force-resets `auto/generate-assets` back to `main`'s
-HEAD — erasing our commit. Using the CLI directly means we have full control over every git
-operation and nothing can silently overwrite our work.
+The CORRECT glitch effect, as extracted from the original construction code, is:
 
-### `latest_map.webp` and `latest_dialogue.webp`
+```python
+# CORRECT: 15 px horizontal x-offset on the red dot layer only
+def render_glitch_map(circles, offset_x=15):
+    for c in circles:
+        c['cx'] += offset_x        # shift x coordinate only
+    # render red (231, 76, 60) dots — no pixel manipulation
+```
 
-GitHub README images are static references. Timestamped files (`alien_sector_F4A1.webp`,
-`dialogue_seq_2024...webp`) change names every run, so the README can't reference them by name.
-Instead, each generator overwrites a fixed-name file after every successful render. The README
-always points to these fixed names, so it automatically shows the newest output without any
-README edits needed.
+There is no per-pixel operation. No numpy. No channel splitting. No scanlines.
+The effect is a simple coordinate offset applied before drawing SVG circles.
 
 ---
 
-## 🔑 Key File Locations
+## 🧠 How It Works
 
-| File | Repo Path |
-|------|-----------|
-| Workflow | `.github/workflows/Workflow-Output.yml` |
-| CI entrypoint | `engines/orchestrator.py` |
-| Groq dialogue gen | `engines/ai_engine.py` |
-| WebP renderer | `engines/dialogue_generator.py` |
-| Map generator | `engines/alien_generator.py` |
-| Shared fonts | `engines/_fonts.py` |
-| Latest map | `output/maps/latest_map.webp` |
-| Latest dialogue | `output/dialogues/latest_dialogue.webp` |
-| Easter egg | `assets/captcha.png` |
+```
+Master-Workflow.yml (schedule 3×/day or workflow_dispatch)
+  │
+  ├── analyze-state    → count assets on Output branch → decide what runs
+  │
+  ├── generate-maps    → alien_generator.py   → output/maps/
+  ├── generate-scripts → ai_engine.py         → output/scripts/
+  ├── render-dialogues → dialogue_generator.py→ output/dialogues/
+  ├── compile-core     → core_engine.py       → output/maps/ (glitch)
+  └── generate-ascii   → ascii_generator.py   → output/ascii/
+        │
+        └── ALL outputs committed exclusively to → Output branch
+```
+
+> **GitOps rule:** `main` branch is never touched by automated commits.
+> All generated assets live on the `Output` branch.
+
+---
+
+## 🏗️ Repository Structure
+
+```
+OffSec-Terminal-Forge/
+├── .github/workflows/
+│   ├── Master-Workflow.yml          # State controller — schedules child workflows
+│   ├── Alien-Maps-Generator.yml     # workflow_call — fractal dot maps
+│   ├── AI-Engine-Workflow.yml       # workflow_call — Groq dialogue scripts
+│   ├── Orchestrator.yml             # workflow_call — WebP dialogue render
+│   ├── Core_Engine_The-Compilor.yml # workflow_call — SVG Islamic map glitch
+│   ├── ACSII-Art-Generator.yml      # workflow_call — ASCII sanctuary art
+│   ├── Debug-Control.yml            # tmate SSH reverse shell for live debug
+│   └── auto_doc_updater.yml         # AI-powered README + DEVELOP updater
+├── engines/
+│   ├── orchestrator.py              # Local entrypoint: ai_engine → dialogue
+│   ├── ai_engine.py                 # Groq API → output/scripts/script_*.json
+│   ├── dialogue_generator.py        # JSON scripts → animated WebP HUD
+│   ├── alien_generator.py           # Fractal noise → dot-matrix alien maps
+│   ├── core_engine.py               # SVG parse → Islamic map + glitch effect
+│   ├── ascii_generator.py           # ASCII.txt → output/ascii/*.txt
+│   ├── doc_updater.py               # OpenRouter → README.md + DEVELOP.md
+│   └── _fonts.py                    # Shared font resolution
+├── assets/
+│   ├── ASCII.txt                    # Sacred garden sanctuary ASCII art
+│   ├── islamic_world_map.svg        # Base SVG for core_engine
+│   ├── captcha.png                  # reCAPTCHA easter egg (closing frame)
+│   └── fonts/                       # UbuntuMono TTF
+├── output/                          # gitignored locally — lives on Output branch
+│   ├── maps/                        # alien_sector_*.webp + latest_map.webp
+│   │                                  glitched_map_*.webp + latest_glitch.webp
+│   ├── scripts/                     # script_{ts}_{i}_{uuid}.json
+│   ├── dialogues/                   # dialogue_seq_*.webp + latest_dialogue.webp
+│   └── ascii/                       # ascii_art_*.txt + latest_ascii.txt
+├── output/Old-Standerd-Of-Final-Output/
+│   └── magic_readme.webp            # ← GOLD STANDARD — do not modify
+├── requirements.txt                 # Pillow, requests, numpy
+├── PROJECT_MEMORY.md                # Architecture context for AI doc updater
+├── README.md                        # This file
+└── DEVELOP.md                       # Contributor technical guide
+```
+
+---
+
+## ⚙️ Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| AI Dialogue | Groq API — Llama 3.3 70B Versatile |
+| Image Engine | Python Pillow (PIL) 12.x |
+| Map Parser | Python `re` on SVG `<circle>` elements |
+| Terrain Gen | Fractal Brownian Motion (fBm) |
+| Output Format | Animated WebP (lossless, 100% quality) |
+| CI/CD | GitHub Actions — ubuntu-latest |
+| Branch Strategy | `main` (code) + `Output` (generated assets) |
+
+---
+
+## 🔒 Secrets Required
+
+| Secret | Environment | Purpose |
+|--------|-------------|---------|
+| `GROQ_API_KEY` | `Dialogue_Generator-AI` | Llama 3.3 70B via Groq |
+| `GH_PAT` | `Dialogue_Generator-AI` | Push to Output branch |
+| `AI_Auto_Projrct_Information_Updater` | repo-level | OpenRouter doc generation |
+
+---
+
+<div align="center">
+
+*Runs on schedule. Commits to Output. main stays clean.*
+
+</div>

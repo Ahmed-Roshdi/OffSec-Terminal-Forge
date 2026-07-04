@@ -13,9 +13,8 @@ jobs:
   generate-ascii:
     name: 🎨 Generate ASCII Art → output/ascii/
     runs-on: ubuntu-latest
-
     steps:
-      - name: 📥 Checkout repository
+      - name: 📥 Checkout main (source + assets)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -27,39 +26,33 @@ jobs:
           python-version: '3.11'
 
       - name: 📦 Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: 🎨 Run ascii_generator.py
-        # ascii_generator.py handles its own graceful fallback:
-        #   - Prefers assets/ASCII.txt (the sacred garden sanctuary)
-        #   - Falls back to built-in cyberpunk banner if file is missing
-        #   - Always produces output/ascii/ascii_art_{ts}.txt
-        #   - Always updates output/ascii/latest_ascii.txt
         run: python engines/ascii_generator.py
 
-      - name: 🔍 Verify ASCII output was created
+      - name: 🔍 Verify ASCII output
         run: |
-          COUNT=$(find output/ascii -name "ascii_art_*.txt" -type f 2>/dev/null | wc -l | tr -d ' ')
+          COUNT=$(find output/ascii -name "ascii_art_*.txt" 2>/dev/null | wc -l | tr -d ' ')
           echo "[*] ASCII files in output/ascii/: $COUNT"
-          if [ "$COUNT" -eq 0 ]; then
-            echo "[!] No ASCII output found — ascii_generator.py may have failed."
-            exit 1
-          fi
-          echo "[+] Latest output:"
-          cat output/ascii/latest_ascii.txt | head -20
+          [ "$COUNT" -gt 0 ] || { echo "[!] No ASCII output generated."; exit 1; }
 
-      - name: 📤 Commit output/ascii/ to main
+      - name: 📤 Push output/ascii/ to Output branch
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin main
+          git fetch origin
+          if git ls-remote --exit-code --heads origin Output >/dev/null 2>&1; then
+            git checkout -B Output origin/Output
+          else
+            echo "[*] Creating Output branch from main."
+            git checkout -B Output
+          fi
           git add -f output/ascii/
           if git diff --cached --quiet; then
-            echo "[*] Nothing new to commit in output/ascii/."
+            echo "[*] Nothing new to commit."
           else
-            git commit -m "🎨 auto: generated ASCII art asset [skip ci]"
-            git push origin main
-            echo "[+] output/ascii/ pushed to main."
+            git commit -m "🎨 auto: generated ASCII art [skip ci]"
+            git push origin Output
+            echo "[+] output/ascii/ → Output branch."
           fi

@@ -1,195 +1,239 @@
 #!/usr/bin/env python3
 """
 engines/core_engine.py  —  Core Engine / The Compilor
-Applies cyberpunk glitch effects to a base earth map image.
+
+Parses the Islamic world map SVG, renders it as a dot-matrix image on the
+gold-standard dark background, and applies the CORRECT glitch effect:
+a simple horizontal x-coordinate offset on the red-channel dot layer.
+
+IMPORTANT — RENDERING FAILURE HISTORY:
+  Previous AI implementations incorrectly applied RGB channel splitting,
+  numpy scanlines, and pixel-sort to this engine. ALL OF THAT WAS WRONG.
+  The gold standard (output/Old-Standerd-Of-Final-Output/magic_readme.webp)
+  contains NO pixel-level glitch. The only "glitch" is a 15 px horizontal
+  shift of the circle x-coordinates in the red overlay layer.
+
+Gold-standard parameters extracted via programmatic analysis:
+  Canvas background : RGB(13, 17, 23)      #0d1117
+  Gray text color   : RGB(139, 148, 158)   #8b949e
+  Green dot color   : RGB(39, 174, 96)     #27ae60 (normal map)
+  Cyan accent       : RGB(0, 212, 255)     #00d4ff
+  Purple accent     : RGB(140, 30, 255)    #8c1eff
+  Glitch red        : RGB(231, 76, 60)     #e74c3c
+  Glitch x-offset   : 15 px (horizontal shift on red overlay only)
+  SVG zoom factor   : 1.25×
+  Dot render scale  : 3× (then downscaled by LANCZOS for anti-alias)
+  Slogan font size  : 22 px
 
 Pipeline:
-  INPUT  : assets/map.png
-  OUTPUT : output/maps/glitched_map_{ts}.webp   (timestamped)
-           output/maps/latest_glitch.webp        (fixed name for README)
-
-Effects (applied in sequence, parameters randomised per run):
-  1. RGB shift   — chromatic aberration, red/blue channel offset  (5–15 px)
-  2. Scanlines   — CRT monitor overlay                            (3–6 px spacing)
-  3. Pixel sort  — hue/luma sort per row above brightness threshold
-                   (uses numpy — fast vectorised ops, <1s on 1200×800)
+  INPUT  : assets/islamic_world_map.svg
+  OUTPUT : output/maps/glitched_map_{ts}.webp
+           output/maps/latest_glitch.webp
 """
 from __future__ import annotations
 
+import math
 import os
-import random
+import re
 import shutil
 import sys
 import time
+from typing import List, Dict
 
 # ── sys.path guard ──────────────────────────────────────────────────────────
 _ENGINES_DIR = os.path.dirname(os.path.abspath(__file__))
 if _ENGINES_DIR not in sys.path:
     sys.path.insert(0, _ENGINES_DIR)
 
-import numpy as np
 from PIL import Image, ImageDraw
 
+from _fonts import load_fonts
+
 # ── Paths ────────────────────────────────────────────────────────────────────
-BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ASSETS_DIR  = os.path.join(BASE_DIR, "assets")
-MAPS_DIR    = os.path.join(BASE_DIR, "output", "maps")
-BASE_MAP    = os.path.join(ASSETS_DIR, "map.png")
-LATEST_PATH = os.path.join(MAPS_DIR, "latest_glitch.webp")
+BASE_DIR     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ASSETS_DIR   = os.path.join(BASE_DIR, "assets")
+MAPS_DIR     = os.path.join(BASE_DIR, "output", "maps")
+SVG_PATH     = os.path.join(ASSETS_DIR, "islamic_world_map.svg")
+LATEST_PATH  = os.path.join(MAPS_DIR, "latest_glitch.webp")
 
-# ── Max working resolution — resize before processing to cap run time ───────
-MAX_W, MAX_H = 1200, 800
+# ── Gold-standard color palette (extracted from magic_readme.webp analysis) ──
+BG_COLOR      = (13, 17, 23)       # #0d1117 — GitHub dark mode bg
+GRAY_COLOR    = (139, 148, 158)    # #8b949e — muted text
+GREEN_COLOR   = (39, 174, 96)      # #27ae60 — normal Islamic dots
+CYAN_COLOR    = (0, 212, 255)      # #00d4ff — OffSec accent
+PURPLE_COLOR  = (140, 30, 255)     # #8c1eff — OffSec accent
+GLITCH_RED    = (231, 76, 60)      # #e74c3c — glitch overlay
+DARK_DOT      = (35, 40, 45)       # non-Islamic country dots
+
+# ── Render constants (from original build_magic_gif.py) ─────────────────────
+SVG_ZOOM    = 1.25    # zoom factor applied to all SVG coordinates
+DOT_SCALE   = 3       # render at 3× then downscale for anti-aliasing
+GLITCH_OFFSET_X = 15  # horizontal pixel shift for the glitch red layer
 
 
-# ── Effect functions ─────────────────────────────────────────────────────────
+# ── SVG parser ────────────────────────────────────────────────────────────────
+def parse_svg_circles(svg_path: str) -> List[Dict]:
+    """
+    Extract circle elements from the SVG.
+    Applies SVG_ZOOM to all coordinates so the map fills the canvas correctly.
+    Returns list of {cx, cy, r, fill} dicts.
+    """
+    with open(svg_path, "r", encoding="utf-8") as f:
+        svg_data = f.read()
 
-def load_base_image(image_path: str) -> Image.Image:
-    """Load, resize to processing cap, and convert to RGBA."""
-    if not os.path.exists(image_path):
-        raise FileNotFoundError(
-            f"[core_engine] Base map not found: {image_path}\n"
-            f"  → Add your earth map at assets/map.png to activate this engine."
+    circles = []
+    pattern = re.compile(
+        r'<circle\s+cx="([^"]+)"\s+cy="([^"]+)"\s+r="([^"]+)"\s+fill="([^"]+)"'
+    )
+    for m in pattern.finditer(svg_data):
+        circles.append({
+            "cx":   float(m.group(1)) * SVG_ZOOM,
+            "cy":   float(m.group(2)) * SVG_ZOOM,
+            "r":    float(m.group(3)) * SVG_ZOOM,
+            "fill": m.group(4),
+        })
+
+    print(f"[core_engine] Parsed {len(circles)} circles from SVG.")
+    return circles
+
+
+# ── Dot map renderer ──────────────────────────────────────────────────────────
+def _render_dot_layer(
+    circles:    List[Dict],
+    canvas_w:   int,
+    canvas_h:   int,
+    glitch:     bool   = False,
+    glitch_x:   int    = GLITCH_OFFSET_X,
+) -> Image.Image:
+    """
+    Render all SVG circles at DOT_SCALE, then downscale to (canvas_w, canvas_h).
+
+    Normal mode : Islamic dots (#27ae60, #f1c40f) → gradient cyan→purple
+                  Others → DARK_DOT
+    Glitch mode : ALL dots → GLITCH_RED, x-coordinates shifted by glitch_x px
+                  (this is the ONLY glitch effect — no pixel manipulation)
+    """
+    scale  = DOT_SCALE
+    max_cx = max(c["cx"] for c in circles)
+    max_cy = max(c["cy"] for c in circles)
+
+    img  = Image.new("RGBA", (int(max_cx * scale + 20 * scale),
+                               int(max_cy * scale + 20 * scale)), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    islamic_fills = {"#27ae60", "#f1c40f"}
+
+    if not glitch:
+        # Identify Mecca centroid for gradient calculation
+        islamic = [c for c in circles if c["fill"] in islamic_fills]
+        if islamic:
+            mecca_x = min(c["cx"] for c in islamic) + (
+                (max(c["cx"] for c in islamic) - min(c["cx"] for c in islamic)) * 0.48
+            )
+            mecca_y = min(c["cy"] for c in islamic) + (
+                (max(c["cy"] for c in islamic) - min(c["cy"] for c in islamic)) * 0.45
+            )
+            max_dist = max(
+                math.hypot(c["cx"] - mecca_x, c["cy"] - mecca_y) for c in islamic
+            )
+        else:
+            mecca_x = mecca_y = max_dist = 1.0
+
+    for c in circles:
+        cx, cy, r = c["cx"], c["cy"], c["r"]
+
+        if glitch:
+            cx += glitch_x
+            fill = GLITCH_RED + (255,)
+        else:
+            if c["fill"] in islamic_fills:
+                dist  = math.hypot(cx - mecca_x, cy - mecca_y)
+                ratio = min(dist / (max_dist * 0.5 + 1e-7), 1.0)
+                red   = int(CYAN_COLOR[0] + (PURPLE_COLOR[0] - CYAN_COLOR[0]) * ratio)
+                grn   = int(CYAN_COLOR[1] + (PURPLE_COLOR[1] - CYAN_COLOR[1]) * ratio)
+                blu   = int(CYAN_COLOR[2] + (PURPLE_COLOR[2] - CYAN_COLOR[2]) * ratio)
+                fill  = (red, grn, blu, 255)
+            else:
+                fill = DARK_DOT + (255,)
+
+        cx_s, cy_s, r_s = cx * scale, cy * scale, r * scale
+        draw.ellipse(
+            [cx_s - r_s, cy_s - r_s, cx_s + r_s, cy_s + r_s],
+            fill=fill,
         )
-    img = Image.open(image_path).convert("RGBA")
-    if img.width > MAX_W or img.height > MAX_H:
-        img.thumbnail((MAX_W, MAX_H), Image.Resampling.LANCZOS)
-    print(f"[core_engine] Loaded: {image_path}  ({img.width}×{img.height})")
-    return img
 
-
-def apply_rgb_shift(image: Image.Image, shift: int = 10) -> Image.Image:
-    """
-    Chromatic aberration — red channel shifts right, blue shifts left.
-    Operates on numpy arrays: fast even for large images.
-    """
-    arr = np.array(image)          # H × W × 4  (RGBA)
-    h, w = arr.shape[:2]
-    result = arr.copy()
-
-    # Red channel: shift right by `shift` pixels
-    if shift < w:
-        result[:, shift:,  0] = arr[:, :w - shift, 0]
-        result[:, :shift,  0] = 0
-
-    # Blue channel: shift left by `shift` pixels
-    if shift < w:
-        result[:, :w - shift, 2] = arr[:, shift:, 2]
-        result[:, w - shift:, 2] = 0
-
-    return Image.fromarray(result.astype(np.uint8), "RGBA")
-
-
-def apply_scanlines(
-    image: Image.Image,
-    line_spacing:    int   = 4,
-    line_brightness: float = 0.2,
-) -> Image.Image:
-    """Overlay dark horizontal CRT scanlines using PIL draw (fast)."""
-    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
-    draw    = ImageDraw.Draw(overlay)
-    alpha   = int(line_brightness * 255)
-
-    for y in range(0, image.height, line_spacing):
-        draw.line([(0, y), (image.width, y)], fill=(0, 0, 0, alpha), width=1)
-
-    return Image.alpha_composite(image.convert("RGBA"), overlay)
-
-
-def apply_pixel_sort(
-    image:          Image.Image,
-    mask_threshold: int = 128,
-    sort_by:        str = "luma",
-) -> Image.Image:
-    """
-    Sort pixels within each row that exceed a brightness threshold.
-    Produces the classic glitch-art datamosh streak effect.
-
-    Uses numpy for full vectorised row operations — runs in <1s on 1200×800.
-    sort_by: 'luma' | 'hue' | 'saturation' | 'value'
-    """
-    arr = np.array(image.convert("RGBA"), dtype=np.uint8)  # H × W × 4
-    h, w = arr.shape[:2]
-
-    rgb = arr[:, :, :3].astype(np.float32)   # H × W × 3
-
-    # ── Compute per-pixel sort key ─────────────────────────────────────────
-    if sort_by in ("luma", "value"):
-        # BT.601 luma — fast, single weighted sum
-        key = (rgb[:, :, 0] * 0.299 +
-               rgb[:, :, 1] * 0.587 +
-               rgb[:, :, 2] * 0.114)           # H × W
-
-    elif sort_by == "saturation":
-        max_c = rgb.max(axis=2)
-        min_c = rgb.min(axis=2)
-        delta = max_c - min_c
-        key   = np.where(max_c > 0, delta / (max_c + 1e-7), 0.0)
-
-    elif sort_by == "hue":
-        # Approximate hue using red channel dominance vs green (good enough for sorting)
-        key = rgb[:, :, 0] - rgb[:, :, 1]      # H × W
-    else:
-        key = rgb.mean(axis=2)
-
-    # ── Per-row sort (only pixels above threshold) ─────────────────────────
-    luma_mask = key > mask_threshold            # H × W  boolean
-
-    for y in range(h):
-        row_mask = luma_mask[y]                 # W boolean
-        if row_mask.sum() < 2:
-            continue
-
-        indices = np.where(row_mask)[0]         # positions to sort
-        sort_order = np.argsort(key[y, indices])
-        sorted_indices = indices[sort_order]
-
-        # Write sorted pixels back (bright pixels exchange positions)
-        original_pixels = arr[y, indices].copy()
-        arr[y, sorted_indices] = original_pixels
-
-    return Image.fromarray(arr, "RGBA")
-
-
-def apply_glitch_effects(image: Image.Image) -> Image.Image:
-    """
-    Apply all three effects in sequence with randomised parameters.
-    Each call produces a unique glitched variant.
-    """
-    shift      = random.randint(5, 15)
-    spacing    = random.randint(3, 6)
-    brightness = round(random.uniform(0.1, 0.4), 2)
-    threshold  = random.randint(100, 200)
-    sort_method= random.choice(["luma", "hue", "saturation", "value"])
-
-    print(f"[core_engine] RGB shift={shift}px")
-    print(f"[core_engine] Scanlines spacing={spacing} brightness={brightness}")
-    print(f"[core_engine] Pixel sort threshold={threshold} method={sort_method}")
-
-    t0  = time.time()
-    img = apply_rgb_shift(image,    shift=shift)
-    t1  = time.time()
-    img = apply_scanlines(img,      line_spacing=spacing, line_brightness=brightness)
-    t2  = time.time()
-    img = apply_pixel_sort(img,     mask_threshold=threshold, sort_by=sort_method)
-    t3  = time.time()
-
-    print(f"[core_engine] Timings — rgb_shift: {t1-t0:.2f}s | "
-          f"scanlines: {t2-t1:.2f}s | pixel_sort: {t3-t2:.2f}s | "
-          f"total: {t3-t0:.2f}s")
-    return img
+    return img.resize((canvas_w, canvas_h - 160), Image.Resampling.LANCZOS)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
+def load_base_image(image_path: str) -> Image.Image:
+    """Retained for API compatibility — loads any raster base image."""
+    return Image.open(image_path).convert("RGBA")
+
+
+def apply_glitch_effects(circles: List[Dict], canvas_w: int, canvas_h: int) -> Image.Image:
+    """
+    The CORRECT glitch: renders red dot layer with x-offset=15.
+    Returns a composited RGB frame on the dark background.
+    """
+    fonts      = load_fonts({"slogan": 22})
+    slogan_font = fonts["slogan"]
+    slogan_text = "No Borders • Mutual Cooperation • One Nation"
+
+    normal_dots = _render_dot_layer(circles, canvas_w, canvas_h, glitch=False)
+    glitch_dots = _render_dot_layer(circles, canvas_w, canvas_h, glitch=True,
+                                    glitch_x=GLITCH_OFFSET_X)
+
+    def _compose(dot_layer: Image.Image) -> Image.Image:
+        frame = Image.new("RGB", (canvas_w, canvas_h), color=BG_COLOR)
+        offset_x = (canvas_w  - dot_layer.width)  // 2
+        offset_y = (canvas_h  - 160 - dot_layer.height) // 2
+        frame.paste(dot_layer, (offset_x, offset_y), dot_layer)
+        draw = ImageDraw.Draw(frame)
+        try:
+            bbox = draw.textbbox((0, 0), slogan_text, font=slogan_font)
+            slogan_w = bbox[2] - bbox[0]
+        except AttributeError:
+            slogan_w, _ = draw.textsize(slogan_text, font=slogan_font)
+        draw.text(
+            ((canvas_w - slogan_w) // 2, canvas_h - 120),
+            slogan_text,
+            fill=GRAY_COLOR,
+            font=slogan_font,
+        )
+        return frame
+
+    normal_frame = _compose(normal_dots)
+    glitch_frame = _compose(glitch_dots)
+
+    # Composite: blend normal and glitched 50/50 for the saved output
+    blended = Image.blend(normal_frame, glitch_frame, alpha=0.5)
+    return blended
+
+
 def main() -> None:
     os.makedirs(MAPS_DIR, exist_ok=True)
-    print("[core_engine] Starting glitch pipeline...")
 
-    base     = load_base_image(BASE_MAP)
-    glitched = apply_glitch_effects(base)
+    if not os.path.exists(SVG_PATH):
+        print(f"[core_engine] SVG not found: {SVG_PATH}")
+        print(f"  → Place islamic_world_map.svg in assets/ to activate this engine.")
+        return
+
+    print("[core_engine] Parsing SVG map data...")
+    circles = parse_svg_circles(SVG_PATH)
+
+    # Infer canvas size from SVG extents + padding
+    max_cx  = max(c["cx"] for c in circles)
+    max_cy  = max(c["cy"] for c in circles)
+    canvas_w = int(max_cx * SVG_ZOOM + 120)
+    canvas_h = int(max_cy * SVG_ZOOM + 280)
+
+    print("[core_engine] Rendering glitch composite...")
+    result = apply_glitch_effects(circles, canvas_w, canvas_h)
 
     ts       = int(time.time())
     out_path = os.path.join(MAPS_DIR, f"glitched_map_{ts}.webp")
-    glitched.convert("RGB").save(out_path, format="WEBP", lossless=True, quality=100)
+    result.save(out_path, format="WEBP", lossless=True, quality=100)
     print(f"[core_engine] Saved: {out_path}")
 
     shutil.copy2(out_path, LATEST_PATH)
