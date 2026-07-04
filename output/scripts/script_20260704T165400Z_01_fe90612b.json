@@ -1,0 +1,45 @@
+{
+  "title": "Shadow Net",
+  "script": [
+    {
+      "user": "UNIT-9X",
+      "text": "Bypassing firewall",
+      "align": "left"
+    },
+    {
+      "user": "CORTEX-8",
+      "text": "Zero-day payload",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-9X",
+      "text": "Exfiltrate now",
+      "align": "left"
+    },
+    {
+      "user": "CORTEX-8",
+      "text": "Ghosting the hub",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-9X",
+      "text": "Hack the drone",
+      "align": "left"
+    },
+    {
+      "user": "CORTEX-8",
+      "text": "Ransomware joke",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-9X",
+      "text": "Crash the node",
+      "align": "left"
+    },
+    {
+      "user": "CORTEX-8",
+      "text": "Dark Knight style",
+      "align": "right"
+    }
+  ]
+}
