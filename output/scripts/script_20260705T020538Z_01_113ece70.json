@@ -1,0 +1,45 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "AXI-9X",
+      "text": "Zero-day exploits are my love",
+      "align": "left"
+    },
+    {
+      "user": "SYN-R4",
+      "text": "Bypassing firewalls is child's play",
+      "align": "right"
+    },
+    {
+      "user": "AXI-9X",
+      "text": "Payload delivered, chaos unleashed",
+      "align": "left"
+    },
+    {
+      "user": "SYN-R4",
+      "text": "Exfiltrate the data, night falls",
+      "align": "right"
+    },
+    {
+      "user": "AXI-9X",
+      "text": "Shadows dance upon the wall",
+      "align": "left"
+    },
+    {
+      "user": "SYN-R4",
+      "text": "Like a digital Phantom opera",
+      "align": "right"
+    },
+    {
+      "user": "AXI-9X",
+      "text": "Silent as a ninja's blade",
+      "align": "left"
+    },
+    {
+      "user": "SYN-R4",
+      "text": "Cutting through the noise, darkness",
+      "align": "right"
+    }
+  ]
+}
