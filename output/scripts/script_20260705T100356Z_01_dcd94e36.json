@@ -1,0 +1,50 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "AURORA-33",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "CORTEX-25",
+      "text": "Bypassing firewalls",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-33",
+      "text": "Payload deployed",
+      "align": "left"
+    },
+    {
+      "user": "CORTEX-25",
+      "text": "Exfiltrating data now",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-33",
+      "text": "Like a digital ninja",
+      "align": "left"
+    },
+    {
+      "user": "CORTEX-25",
+      "text": "Stealthy as a ghost",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-33",
+      "text": "Hacking like Beatles",
+      "align": "left"
+    },
+    {
+      "user": "CORTEX-25",
+      "text": "Come together, payload",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-33",
+      "text": "Dark side of code",
+      "align": "left"
+    }
+  ]
+}
