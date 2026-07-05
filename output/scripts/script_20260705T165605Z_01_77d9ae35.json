@@ -1,0 +1,45 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "UNIT-9X",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "AURORA-84",
+      "text": "Exfiltrate payload",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-9X",
+      "text": "Zero-day exploit",
+      "align": "left"
+    },
+    {
+      "user": "AURORA-84",
+      "text": "Ghosting the node",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-9X",
+      "text": "Hack the Gibson",
+      "align": "left"
+    },
+    {
+      "user": "AURORA-84",
+      "text": "Infiltrate mainframe",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-9X",
+      "text": "Like a digital ninja",
+      "align": "left"
+    },
+    {
+      "user": "AURORA-84",
+      "text": "Silent as a ghost",
+      "align": "right"
+    }
+  ]
+}
