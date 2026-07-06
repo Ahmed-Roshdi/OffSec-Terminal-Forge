@@ -1,0 +1,45 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "HEX-44",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "AURORA-15",
+      "text": "Payload deploying now",
+      "align": "right"
+    },
+    {
+      "user": "HEX-44",
+      "text": "Bypassing firewall",
+      "align": "left"
+    },
+    {
+      "user": "AURORA-15",
+      "text": "Exfiltrate the data",
+      "align": "right"
+    },
+    {
+      "user": "HEX-44",
+      "text": "Like pirates",
+      "align": "left"
+    },
+    {
+      "user": "AURORA-15",
+      "text": "Plundering bytes",
+      "align": "right"
+    },
+    {
+      "user": "HEX-44",
+      "text": "Digital looters",
+      "align": "left"
+    },
+    {
+      "user": "AURORA-15",
+      "text": "Laughing all way",
+      "align": "right"
+    }
+  ]
+}
