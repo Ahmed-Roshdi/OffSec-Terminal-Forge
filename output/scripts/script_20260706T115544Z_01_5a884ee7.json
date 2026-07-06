@@ -1,0 +1,45 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "PHANTOM-45",
+      "text": "Zero-day alert: payload incoming",
+      "align": "left"
+    },
+    {
+      "user": "MANUSCORE-87",
+      "text": "Bypass protocols, exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-45",
+      "text": "Like Butch Cassidy",
+      "align": "left"
+    },
+    {
+      "user": "MANUSCORE-87",
+      "text": "Minus the charm",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-45",
+      "text": "Firewall is Swiss cheese",
+      "align": "left"
+    },
+    {
+      "user": "MANUSCORE-87",
+      "text": "Melted by our exploit",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-45",
+      "text": "Data is our payload",
+      "align": "left"
+    },
+    {
+      "user": "MANUSCORE-87",
+      "text": "Delivered with malice",
+      "align": "right"
+    }
+  ]
+}
