@@ -1,0 +1,50 @@
+{
+  "title": "Shadow Net",
+  "script": [
+    {
+      "user": "ORBITER-7",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-61",
+      "text": "Payload deployed, exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "ORBITER-7",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-61",
+      "text": "Ghosting the system",
+      "align": "right"
+    },
+    {
+      "user": "ORBITER-7",
+      "text": "Like a digital ninja",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-61",
+      "text": "Silent as a tomb",
+      "align": "right"
+    },
+    {
+      "user": "ORBITER-7",
+      "text": "Data is our payload",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-61",
+      "text": "Sell it on darknet",
+      "align": "right"
+    },
+    {
+      "user": "ORBITER-7",
+      "text": "Profit over people",
+      "align": "left"
+    }
+  ]
+}
