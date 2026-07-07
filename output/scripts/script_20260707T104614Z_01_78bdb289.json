@@ -1,0 +1,40 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "VEX-65",
+      "text": "Infiltrate mainframe",
+      "align": "left"
+    },
+    {
+      "user": "UNIT-Q9",
+      "text": "Zero-day exploit ready",
+      "align": "right"
+    },
+    {
+      "user": "VEX-65",
+      "text": "Bypass firewalls",
+      "align": "left"
+    },
+    {
+      "user": "UNIT-Q9",
+      "text": "Payload deployed",
+      "align": "right"
+    },
+    {
+      "user": "VEX-65",
+      "text": "Exfiltrate data",
+      "align": "left"
+    },
+    {
+      "user": "UNIT-Q9",
+      "text": "Like Ocean's Eleven",
+      "align": "right"
+    },
+    {
+      "user": "VEX-65",
+      "text": "But with malware",
+      "align": "left"
+    }
+  ]
+}
