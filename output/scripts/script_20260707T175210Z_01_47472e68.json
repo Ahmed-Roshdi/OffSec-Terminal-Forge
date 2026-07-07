@@ -1,0 +1,45 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "CIPHER-76",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "MANUSCORE-73",
+      "text": "Exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-76",
+      "text": "Zero-day exploit",
+      "align": "left"
+    },
+    {
+      "user": "MANUSCORE-73",
+      "text": "Payload deployed",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-76",
+      "text": "Like a digital ninja",
+      "align": "left"
+    },
+    {
+      "user": "MANUSCORE-73",
+      "text": "Stealth mode engaged",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-76",
+      "text": "Ghost in machine",
+      "align": "left"
+    },
+    {
+      "user": "MANUSCORE-73",
+      "text": "Burning zero-days",
+      "align": "right"
+    }
+  ]
+}
