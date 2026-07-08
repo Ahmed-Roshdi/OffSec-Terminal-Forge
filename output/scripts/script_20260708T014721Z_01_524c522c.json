@@ -1,0 +1,50 @@
+{
+  "title": "Dark Net Duel",
+  "script": [
+    {
+      "user": "NODE-R4",
+      "text": "Zero-day exploit found.",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-20",
+      "text": "Payload ready to exfiltrate.",
+      "align": "right"
+    },
+    {
+      "user": "NODE-R4",
+      "text": "Bypass their firewall.",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-20",
+      "text": "Like a digital ninja.",
+      "align": "right"
+    },
+    {
+      "user": "NODE-R4",
+      "text": "Hack their mainframe.",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-20",
+      "text": "Shakespearean cyber chaos.",
+      "align": "right"
+    },
+    {
+      "user": "NODE-R4",
+      "text": "Crash their system.",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-20",
+      "text": "Digital dark ages.",
+      "align": "right"
+    },
+    {
+      "user": "NODE-R4",
+      "text": "Ghost in machine.",
+      "align": "left"
+    }
+  ]
+}
