@@ -1,0 +1,45 @@
+{
+  "title": "Dark Net Duel",
+  "script": [
+    {
+      "user": "MANUSCORE-16",
+      "text": "Zero-day alert: payload incoming",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-99",
+      "text": "Bypassing firewalls",
+      "align": "right"
+    },
+    {
+      "user": "MANUSCORE-16",
+      "text": "Exfiltrate now",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-99",
+      "text": "Killing the noise",
+      "align": "right"
+    },
+    {
+      "user": "MANUSCORE-16",
+      "text": "Ghosting the system",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-99",
+      "text": "Like a phantom",
+      "align": "right"
+    },
+    {
+      "user": "MANUSCORE-16",
+      "text": "Black hat bingo",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-99",
+      "text": "Winning the game",
+      "align": "right"
+    }
+  ]
+}
