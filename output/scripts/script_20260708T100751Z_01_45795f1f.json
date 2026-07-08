@@ -1,0 +1,40 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "CORTEX-79",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "AURORA-47",
+      "text": "Payload delivered",
+      "align": "right"
+    },
+    {
+      "user": "CORTEX-79",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "AURORA-47",
+      "text": "Exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "CORTEX-79",
+      "text": "Tango down",
+      "align": "left"
+    },
+    {
+      "user": "AURORA-47",
+      "text": "Ghosting system",
+      "align": "right"
+    },
+    {
+      "user": "CORTEX-79",
+      "text": "Mission accomplished",
+      "align": "left"
+    }
+  ]
+}
