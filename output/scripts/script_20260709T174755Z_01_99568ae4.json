@@ -1,0 +1,45 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "NOVA-T-01",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "UNIT-K2",
+      "text": "Exfiltrate payload",
+      "align": "right"
+    },
+    {
+      "user": "NOVA-T-01",
+      "text": "Zero-day exploit",
+      "align": "left"
+    },
+    {
+      "user": "UNIT-K2",
+      "text": "Like a digital ninja",
+      "align": "right"
+    },
+    {
+      "user": "NOVA-T-01",
+      "text": "Ghost in machines",
+      "align": "left"
+    },
+    {
+      "user": "UNIT-K2",
+      "text": "Sneaky little bug",
+      "align": "right"
+    },
+    {
+      "user": "NOVA-T-01",
+      "text": "System crash imminent",
+      "align": "left"
+    },
+    {
+      "user": "UNIT-K2",
+      "text": "Party like 1999",
+      "align": "right"
+    }
+  ]
+}
