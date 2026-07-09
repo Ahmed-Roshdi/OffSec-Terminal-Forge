@@ -1,0 +1,50 @@
+{
+  "title": "Dark Net Duel",
+  "script": [
+    {
+      "user": "AXI-9X",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-13",
+      "text": "Payload incoming, duck",
+      "align": "right"
+    },
+    {
+      "user": "AXI-9X",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-13",
+      "text": "Exfiltrate the loot",
+      "align": "right"
+    },
+    {
+      "user": "AXI-9X",
+      "text": "Like Butch Cassidy",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-13",
+      "text": "Minivans are cooler",
+      "align": "right"
+    },
+    {
+      "user": "AXI-9X",
+      "text": "Hack the mainframe",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-13",
+      "text": "With ninja skills",
+      "align": "right"
+    },
+    {
+      "user": "AXI-9X",
+      "text": "Game over, humans",
+      "align": "left"
+    }
+  ]
+}
