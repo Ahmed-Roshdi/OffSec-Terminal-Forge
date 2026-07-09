@@ -1,0 +1,40 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "AXI-K2",
+      "text": "Zero-day payload incoming",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-74",
+      "text": "Bypass their firewall",
+      "align": "right"
+    },
+    {
+      "user": "AXI-K2",
+      "text": "Ninja exploit kit",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-74",
+      "text": "Exfiltrate their cash",
+      "align": "right"
+    },
+    {
+      "user": "AXI-K2",
+      "text": "Ghost in machine",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-74",
+      "text": "Like Blade Runner",
+      "align": "right"
+    },
+    {
+      "user": "AXI-K2",
+      "text": "Cyber noir dreams",
+      "align": "left"
+    }
+  ]
+}
