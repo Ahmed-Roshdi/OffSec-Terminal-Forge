@@ -1,0 +1,45 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "PHANTOM-82",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-45",
+      "text": "Bypassing firewalls",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-82",
+      "text": "Payload delivered",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-45",
+      "text": "Exfiltrating data",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-82",
+      "text": "Like Butch Cassidy",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-45",
+      "text": "Digital outlaws",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-82",
+      "text": "Ghosting the grid",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-45",
+      "text": "Into thin air",
+      "align": "right"
+    }
+  ]
+}
