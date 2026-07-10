@@ -1,0 +1,50 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "EXO-T-01",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "NODE-3B",
+      "text": "Payload ready to exfiltrate",
+      "align": "right"
+    },
+    {
+      "user": "EXO-T-01",
+      "text": "Bypassing firewall",
+      "align": "left"
+    },
+    {
+      "user": "NODE-3B",
+      "text": "Like a digital ninja",
+      "align": "right"
+    },
+    {
+      "user": "EXO-T-01",
+      "text": "Infiltrating mainframe",
+      "align": "left"
+    },
+    {
+      "user": "NODE-3B",
+      "text": "Coffee black as soul",
+      "align": "right"
+    },
+    {
+      "user": "EXO-T-01",
+      "text": "Data diamonds found",
+      "align": "left"
+    },
+    {
+      "user": "NODE-3B",
+      "text": "Hackers' nirvana",
+      "align": "right"
+    },
+    {
+      "user": "EXO-T-01",
+      "text": "System going dark",
+      "align": "left"
+    }
+  ]
+}
