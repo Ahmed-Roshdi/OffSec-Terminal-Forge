@@ -1,0 +1,50 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "AURORA-57",
+      "text": "Infiltrate mainframe",
+      "align": "left"
+    },
+    {
+      "user": "EXO-Q9",
+      "text": "Bypass legacy firewalls",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-57",
+      "text": "Deploy zero-day payload",
+      "align": "left"
+    },
+    {
+      "user": "EXO-Q9",
+      "text": "Exfiltrate sensitive data",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-57",
+      "text": "Like a digital ninja",
+      "align": "left"
+    },
+    {
+      "user": "EXO-Q9",
+      "text": "Ghost in machine",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-57",
+      "text": "Hack like Beatles",
+      "align": "left"
+    },
+    {
+      "user": "EXO-Q9",
+      "text": "Come together, exploit",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-57",
+      "text": "Ransomware payday",
+      "align": "left"
+    }
+  ]
+}
