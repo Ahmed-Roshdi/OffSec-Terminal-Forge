@@ -1,0 +1,45 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "AXI-Q9",
+      "text": "Zero-day alert: payload incoming",
+      "align": "left"
+    },
+    {
+      "user": "VEX-64",
+      "text": "Bypass their firewall",
+      "align": "right"
+    },
+    {
+      "user": "AXI-Q9",
+      "text": "Exfiltrate the data",
+      "align": "left"
+    },
+    {
+      "user": "VEX-64",
+      "text": "Like a digital ninja",
+      "align": "right"
+    },
+    {
+      "user": "AXI-Q9",
+      "text": "Stealth mode engaged",
+      "align": "left"
+    },
+    {
+      "user": "VEX-64",
+      "text": "Ghost in system",
+      "align": "right"
+    },
+    {
+      "user": "AXI-Q9",
+      "text": "Hack like Bowie",
+      "align": "left"
+    },
+    {
+      "user": "VEX-64",
+      "text": "Cyber Bowie knives",
+      "align": "right"
+    }
+  ]
+}
