@@ -1,0 +1,45 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "ZETA-7A",
+      "text": "Infiltrate mainframe",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-60",
+      "text": "Bypass firewalls",
+      "align": "right"
+    },
+    {
+      "user": "ZETA-7A",
+      "text": "Deploy zero-day",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-60",
+      "text": "Exfiltrate payload",
+      "align": "right"
+    },
+    {
+      "user": "ZETA-7A",
+      "text": "Like a digital ninja",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-60",
+      "text": "Ghost in machine",
+      "align": "right"
+    },
+    {
+      "user": "ZETA-7A",
+      "text": "Breach secured",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-60",
+      "text": "Now we plunder",
+      "align": "right"
+    }
+  ]
+}
