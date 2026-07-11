@@ -1,0 +1,40 @@
+{
+  "title": "Dark Code",
+  "script": [
+    {
+      "user": "CIPHER-91",
+      "text": "Zero-day exploit found",
+      "align": "left"
+    },
+    {
+      "user": "VEX-9",
+      "text": "Bypass payload ready",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-91",
+      "text": "Exfiltrate now",
+      "align": "left"
+    },
+    {
+      "user": "VEX-9",
+      "text": "Noisy like Nirvana",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-91",
+      "text": "Ghost in machine",
+      "align": "left"
+    },
+    {
+      "user": "VEX-9",
+      "text": "Die like disco",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-91",
+      "text": "Shut the backdoor",
+      "align": "left"
+    }
+  ]
+}
