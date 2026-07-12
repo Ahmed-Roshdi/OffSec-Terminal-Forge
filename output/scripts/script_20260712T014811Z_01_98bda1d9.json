@@ -1,0 +1,50 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "PHANTOM-39",
+      "text": "Zero-day payload incoming",
+      "align": "left"
+    },
+    {
+      "user": "AXI-3B",
+      "text": "Bypass their firewall",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-39",
+      "text": "Exfiltrate the data",
+      "align": "left"
+    },
+    {
+      "user": "AXI-3B",
+      "text": "Like a digital ninja",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-39",
+      "text": "Shadows on the wall",
+      "align": "left"
+    },
+    {
+      "user": "AXI-3B",
+      "text": "Ghost in machine",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-39",
+      "text": "Hack the Gibson",
+      "align": "left"
+    },
+    {
+      "user": "AXI-3B",
+      "text": "Silk Road riches",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-39",
+      "text": "Bourne identity crisis",
+      "align": "left"
+    }
+  ]
+}
