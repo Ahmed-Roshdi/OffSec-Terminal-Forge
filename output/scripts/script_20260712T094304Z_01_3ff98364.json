@@ -1,0 +1,50 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "HEX-R4",
+      "text": "Zero-day payload ready",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-61",
+      "text": "Bypass their firewall",
+      "align": "right"
+    },
+    {
+      "user": "HEX-R4",
+      "text": "Exfiltrate the data",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-61",
+      "text": "Like a digital ninja",
+      "align": "right"
+    },
+    {
+      "user": "HEX-R4",
+      "text": "Ghost in the shell",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-61",
+      "text": "Matrix style takeover",
+      "align": "right"
+    },
+    {
+      "user": "HEX-R4",
+      "text": "Hack the mainframe",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-61",
+      "text": "Total system failure",
+      "align": "right"
+    },
+    {
+      "user": "HEX-R4",
+      "text": "Dark web secrets",
+      "align": "left"
+    }
+  ]
+}
