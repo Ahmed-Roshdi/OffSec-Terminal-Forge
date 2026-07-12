@@ -1,0 +1,40 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "VEX-21",
+      "text": "Zero-day payload incoming",
+      "align": "left"
+    },
+    {
+      "user": "NOVA-3B",
+      "text": "Bypass their firewall",
+      "align": "right"
+    },
+    {
+      "user": "VEX-21",
+      "text": "Exfiltrate the loot",
+      "align": "left"
+    },
+    {
+      "user": "NOVA-3B",
+      "text": "Like Butch Cassidy",
+      "align": "right"
+    },
+    {
+      "user": "VEX-21",
+      "text": "Dark web awaits",
+      "align": "left"
+    },
+    {
+      "user": "NOVA-3B",
+      "text": "Sell to highest bidder",
+      "align": "right"
+    },
+    {
+      "user": "VEX-21",
+      "text": "Digital gold rush",
+      "align": "left"
+    }
+  ]
+}
