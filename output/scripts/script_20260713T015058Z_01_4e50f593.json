@@ -1,0 +1,50 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "UNIT-7A",
+      "text": "Found zero-day exploit",
+      "align": "left"
+    },
+    {
+      "user": "HEX-T-01",
+      "text": "Bypass firewall now",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-7A",
+      "text": "Payload deployed",
+      "align": "left"
+    },
+    {
+      "user": "HEX-T-01",
+      "text": "Exfiltrate data",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-7A",
+      "text": "Like butter, smooth",
+      "align": "left"
+    },
+    {
+      "user": "HEX-T-01",
+      "text": "Hack like Naruto",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-7A",
+      "text": "Ghost in system",
+      "align": "left"
+    },
+    {
+      "user": "HEX-T-01",
+      "text": "Vanish like magic",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-7A",
+      "text": "Digital ninjas",
+      "align": "left"
+    }
+  ]
+}
