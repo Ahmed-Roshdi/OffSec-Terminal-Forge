@@ -1,0 +1,50 @@
+{
+  "title": "Zero Day Heist",
+  "script": [
+    {
+      "user": "UNIT-3B",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-71",
+      "text": "Exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-3B",
+      "text": "Payload deployed",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-71",
+      "text": "Zero-day exploit",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-3B",
+      "text": "Like Ocean's Eleven",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-71",
+      "text": "But with malware",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-3B",
+      "text": "In and out",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-71",
+      "text": "Before sunrise",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-3B",
+      "text": "With all credits",
+      "align": "left"
+    }
+  ]
+}
