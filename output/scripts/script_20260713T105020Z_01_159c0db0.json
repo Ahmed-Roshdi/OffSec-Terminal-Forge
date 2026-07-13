@@ -1,0 +1,45 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "PHANTOM-78",
+      "text": "Infiltrating zero-day payload",
+      "align": "left"
+    },
+    {
+      "user": "NOVA-K2",
+      "text": "Bypassing firewalls",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-78",
+      "text": "Exfiltrate the loot",
+      "align": "left"
+    },
+    {
+      "user": "NOVA-K2",
+      "text": "Like Butch Cassidy",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-78",
+      "text": "Ghosting the system",
+      "align": "left"
+    },
+    {
+      "user": "NOVA-K2",
+      "text": "Digital napalm",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-78",
+      "text": "Silent takedown",
+      "align": "left"
+    },
+    {
+      "user": "NOVA-K2",
+      "text": "Bourne style escape",
+      "align": "right"
+    }
+  ]
+}
