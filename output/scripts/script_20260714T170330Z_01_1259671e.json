@@ -1,0 +1,40 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "CIPHER-69",
+      "text": "Zero-day payload incoming",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-16",
+      "text": "Bypass their firewall",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-69",
+      "text": "Exfiltrate the loot",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-16",
+      "text": "Like Butch Cassidy",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-69",
+      "text": "Ghost in the code",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-16",
+      "text": "Ransomware gold",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-69",
+      "text": "Silk Road dreams",
+      "align": "left"
+    }
+  ]
+}
