@@ -1,0 +1,40 @@
+{
+  "title": "Shadow Net",
+  "script": [
+    {
+      "user": "ORBITER-4",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "SYN-T-01",
+      "text": "Bypassing firewalls",
+      "align": "right"
+    },
+    {
+      "user": "ORBITER-4",
+      "text": "Payload deployed",
+      "align": "left"
+    },
+    {
+      "user": "SYN-T-01",
+      "text": "Exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "ORBITER-4",
+      "text": "Troyan horse incoming",
+      "align": "left"
+    },
+    {
+      "user": "SYN-T-01",
+      "text": "Ghosting the system",
+      "align": "right"
+    },
+    {
+      "user": "ORBITER-4",
+      "text": "Kaboom, payload detonated",
+      "align": "left"
+    }
+  ]
+}
