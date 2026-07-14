@@ -1,0 +1,50 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "UNIT-T-01",
+      "text": "Zero-day payload incoming",
+      "align": "left"
+    },
+    {
+      "user": "NOVA-K2",
+      "text": "Bypass failed, try again",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-T-01",
+      "text": "Exfiltrate now, no time",
+      "align": "left"
+    },
+    {
+      "user": "NOVA-K2",
+      "text": "Pizza party after exploit",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-T-01",
+      "text": "No joy, system locked",
+      "align": "left"
+    },
+    {
+      "user": "NOVA-K2",
+      "text": "Use Nietzsche's backdoor",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-T-01",
+      "text": "Borg cube not responding",
+      "align": "left"
+    },
+    {
+      "user": "NOVA-K2",
+      "text": "Try Borg queen's password",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-T-01",
+      "text": "Taco Tuesday distraction",
+      "align": "left"
+    }
+  ]
+}
