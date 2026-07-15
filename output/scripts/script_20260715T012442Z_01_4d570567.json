@@ -1,0 +1,50 @@
+{
+  "title": "Zero Day",
+  "script": [
+    {
+      "user": "AURORA-28",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "HEX-K2",
+      "text": "Exfiltrate the payload",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-28",
+      "text": "Like a digital ninja",
+      "align": "left"
+    },
+    {
+      "user": "HEX-K2",
+      "text": "Zero-day exploit",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-28",
+      "text": "Hacking like Beatles",
+      "align": "left"
+    },
+    {
+      "user": "HEX-K2",
+      "text": "Backdoor open",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-28",
+      "text": "Dark side rising",
+      "align": "left"
+    },
+    {
+      "user": "HEX-K2",
+      "text": "System compromised",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-28",
+      "text": "Mission accomplished",
+      "align": "left"
+    }
+  ]
+}
