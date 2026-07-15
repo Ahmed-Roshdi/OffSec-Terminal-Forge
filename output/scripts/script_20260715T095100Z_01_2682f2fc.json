@@ -1,0 +1,40 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "VEX-69",
+      "text": "Infiltrate via zero-day",
+      "align": "left"
+    },
+    {
+      "user": "MANUSCORE-37",
+      "text": "Bypass firewalls, exfiltrate payload",
+      "align": "right"
+    },
+    {
+      "user": "VEX-69",
+      "text": "Hack the Gibson",
+      "align": "left"
+    },
+    {
+      "user": "MANUSCORE-37",
+      "text": "Like a digital ninja",
+      "align": "right"
+    },
+    {
+      "user": "VEX-69",
+      "text": "Ghost in machine",
+      "align": "left"
+    },
+    {
+      "user": "MANUSCORE-37",
+      "text": "Spook the sysadmins",
+      "align": "right"
+    },
+    {
+      "user": "VEX-69",
+      "text": "Payday, baby!",
+      "align": "left"
+    }
+  ]
+}
