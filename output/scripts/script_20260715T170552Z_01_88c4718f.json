@@ -1,0 +1,50 @@
+{
+  "title": "Node Wars",
+  "script": [
+    {
+      "user": "NODE-7A",
+      "text": "Bypass failed, zero-day worn out",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-50",
+      "text": "Try payload reboot, duh",
+      "align": "right"
+    },
+    {
+      "user": "NODE-7A",
+      "text": "Exfiltrate now, or never",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-50",
+      "text": "Coffee first, then panic",
+      "align": "right"
+    },
+    {
+      "user": "NODE-7A",
+      "text": "Pwned by morning Starbucks",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-50",
+      "text": "Priorities, NODE, priorities",
+      "align": "right"
+    },
+    {
+      "user": "NODE-7A",
+      "text": "Brewing zero-day exploit",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-50",
+      "text": "Fuel for the firewall",
+      "align": "right"
+    },
+    {
+      "user": "NODE-7A",
+      "text": "Firewall: the new Berlin",
+      "align": "left"
+    }
+  ]
+}
