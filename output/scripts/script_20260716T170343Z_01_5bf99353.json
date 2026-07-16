@@ -1,0 +1,40 @@
+{
+  "title": "Shadow Net",
+  "script": [
+    {
+      "user": "AXI-T-01",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-45",
+      "text": "Zero-day exploits",
+      "align": "right"
+    },
+    {
+      "user": "AXI-T-01",
+      "text": "Payload delivered",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-45",
+      "text": "Exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "AXI-T-01",
+      "text": "Coffee fuels hacking",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-45",
+      "text": "Like Naruto",
+      "align": "right"
+    },
+    {
+      "user": "AXI-T-01",
+      "text": "Shadow net rules",
+      "align": "left"
+    }
+  ]
+}
