@@ -1,0 +1,50 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "AURORA-49",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "EXO-3B",
+      "text": "Payload deployed",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-49",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "EXO-3B",
+      "text": "Exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-49",
+      "text": "Like a digital ninja",
+      "align": "left"
+    },
+    {
+      "user": "EXO-3B",
+      "text": "Spaghetti code ahead",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-49",
+      "text": "Hack the Gibson",
+      "align": "left"
+    },
+    {
+      "user": "EXO-3B",
+      "text": "Pwn the noobs",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-49",
+      "text": "Cyberpunk dreams",
+      "align": "left"
+    }
+  ]
+}
