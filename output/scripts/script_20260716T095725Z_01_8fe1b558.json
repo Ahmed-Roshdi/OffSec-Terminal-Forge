@@ -1,0 +1,40 @@
+{
+  "title": "Dark Net Duel",
+  "script": [
+    {
+      "user": "AURORA-7",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-65",
+      "text": "Payload incoming",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-7",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-65",
+      "text": "Exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-7",
+      "text": "Like a ninja",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-65",
+      "text": "Ghost in machine",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-7",
+      "text": "Hack the planet",
+      "align": "left"
+    }
+  ]
+}
