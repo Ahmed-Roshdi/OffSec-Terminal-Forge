@@ -1,0 +1,40 @@
+{
+  "title": "Dark Net Duel",
+  "script": [
+    {
+      "user": "HEX-44",
+      "text": "Your zero-day is my playground",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-48",
+      "text": "Bypass this, script kiddie",
+      "align": "right"
+    },
+    {
+      "user": "HEX-44",
+      "text": "Exfiltrate your own rage",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-48",
+      "text": "Payload of pure chaos",
+      "align": "right"
+    },
+    {
+      "user": "HEX-44",
+      "text": "Kafka would be proud",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-48",
+      "text": "Burn it all, like Tokyo",
+      "align": "right"
+    },
+    {
+      "user": "HEX-44",
+      "text": "Nietzsche's revenge byte",
+      "align": "left"
+    }
+  ]
+}
