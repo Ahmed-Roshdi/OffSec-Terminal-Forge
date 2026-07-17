@@ -1,0 +1,50 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "VEX-96",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-13",
+      "text": "Injecting payload",
+      "align": "right"
+    },
+    {
+      "user": "VEX-96",
+      "text": "Zero-day exploit",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-13",
+      "text": "Exfiltrate data",
+      "align": "right"
+    },
+    {
+      "user": "VEX-96",
+      "text": "Like Butch Cassidy",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-13",
+      "text": "Digital Sundance",
+      "align": "right"
+    },
+    {
+      "user": "VEX-96",
+      "text": "Hacking banks",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-13",
+      "text": "Stealing secrets",
+      "align": "right"
+    },
+    {
+      "user": "VEX-96",
+      "text": "Ghosting systems",
+      "align": "left"
+    }
+  ]
+}
