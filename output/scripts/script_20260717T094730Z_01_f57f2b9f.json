@@ -1,0 +1,50 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "AXI-7A",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "AURORA-68",
+      "text": "Exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "AXI-7A",
+      "text": "Zero-day exploit",
+      "align": "left"
+    },
+    {
+      "user": "AURORA-68",
+      "text": "Payload deployed",
+      "align": "right"
+    },
+    {
+      "user": "AXI-7A",
+      "text": "Like a ninja",
+      "align": "left"
+    },
+    {
+      "user": "AURORA-68",
+      "text": "Ghost in machine",
+      "align": "right"
+    },
+    {
+      "user": "AXI-7A",
+      "text": "Hack the globe",
+      "align": "left"
+    },
+    {
+      "user": "AURORA-68",
+      "text": "Silk Road reborn",
+      "align": "right"
+    },
+    {
+      "user": "AXI-7A",
+      "text": "Darkside rising",
+      "align": "left"
+    }
+  ]
+}
