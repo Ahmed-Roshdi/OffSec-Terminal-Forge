@@ -1,0 +1,40 @@
+{
+  "title": "Dark Net Duel",
+  "script": [
+    {
+      "user": "EXO-9X",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "NOVA-3B",
+      "text": "Payload delivered, fool",
+      "align": "right"
+    },
+    {
+      "user": "EXO-9X",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "NOVA-3B",
+      "text": "Exfiltrate now, newbie",
+      "align": "right"
+    },
+    {
+      "user": "EXO-9X",
+      "text": "Ghosting your IP",
+      "align": "left"
+    },
+    {
+      "user": "NOVA-3B",
+      "text": "Trolling like Shakespeare",
+      "align": "right"
+    },
+    {
+      "user": "EXO-9X",
+      "text": "Hack the Gibson",
+      "align": "left"
+    }
+  ]
+}
