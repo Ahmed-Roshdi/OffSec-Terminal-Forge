@@ -1,0 +1,50 @@
+{
+  "title": "Dark Net Duel",
+  "script": [
+    {
+      "user": "AURORA-51",
+      "text": "Zero-day exploit failed",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-61",
+      "text": "Payload delivered",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-51",
+      "text": "Bypassing firewall",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-61",
+      "text": "Exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-51",
+      "text": "Like Beatles yesterday",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-61",
+      "text": "Die like Romeo",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-51",
+      "text": "Firing SQL gun",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-61",
+      "text": "Crash the site",
+      "align": "right"
+    },
+    {
+      "user": "AURORA-51",
+      "text": "Tears of joy",
+      "align": "left"
+    }
+  ]
+}
