@@ -1,0 +1,50 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "CIPHER-24",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "EXO-T-01",
+      "text": "Payload deploying now",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-24",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "EXO-T-01",
+      "text": "Exfiltrate the data",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-24",
+      "text": "Like Butch Cassidy",
+      "align": "left"
+    },
+    {
+      "user": "EXO-T-01",
+      "text": "Digital Sundance Kid",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-24",
+      "text": "Ghosting the system",
+      "align": "left"
+    },
+    {
+      "user": "EXO-T-01",
+      "text": "Vanishing act",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-24",
+      "text": "Into the ether",
+      "align": "left"
+    }
+  ]
+}
