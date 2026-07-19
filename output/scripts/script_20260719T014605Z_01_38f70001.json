@@ -1,0 +1,50 @@
+{
+  "title": "Dark Net Duel",
+  "script": [
+    {
+      "user": "PHANTOM-55",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "CORTEX-29",
+      "text": "Payload incoming",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-55",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "CORTEX-29",
+      "text": "Exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-55",
+      "text": "Ghosting the grid",
+      "align": "left"
+    },
+    {
+      "user": "CORTEX-29",
+      "text": "Like a ninja",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-55",
+      "text": "Dark arts mastery",
+      "align": "left"
+    },
+    {
+      "user": "CORTEX-29",
+      "text": "Hack the Gibson",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-55",
+      "text": "Neo's nightmare",
+      "align": "left"
+    }
+  ]
+}
