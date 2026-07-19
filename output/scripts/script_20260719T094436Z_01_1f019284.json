@@ -1,0 +1,45 @@
+{
+  "title": "Dark Web Duel",
+  "script": [
+    {
+      "user": "NOVA-44",
+      "text": "Your payload is weak.",
+      "align": "left"
+    },
+    {
+      "user": "CORTEX-66",
+      "text": "Zero-day exploits ahead.",
+      "align": "right"
+    },
+    {
+      "user": "NOVA-44",
+      "text": "Bypassing firewalls easily.",
+      "align": "left"
+    },
+    {
+      "user": "CORTEX-66",
+      "text": "Exfiltrate the data now.",
+      "align": "right"
+    },
+    {
+      "user": "NOVA-44",
+      "text": "Like a digital ninja.",
+      "align": "left"
+    },
+    {
+      "user": "CORTEX-66",
+      "text": "Silent as a ghost.",
+      "align": "right"
+    },
+    {
+      "user": "NOVA-44",
+      "text": "Hackers are the new rockstars.",
+      "align": "left"
+    },
+    {
+      "user": "CORTEX-66",
+      "text": "With zero-day groupies.",
+      "align": "right"
+    }
+  ]
+}
