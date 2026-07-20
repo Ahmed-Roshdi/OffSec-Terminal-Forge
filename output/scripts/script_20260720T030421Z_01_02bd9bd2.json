@@ -1,0 +1,40 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "PHANTOM-53",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "VEX-91",
+      "text": "Payload injected, bypass successful",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-53",
+      "text": "Exfiltrate now, kids",
+      "align": "left"
+    },
+    {
+      "user": "VEX-91",
+      "text": "Bacon pancakes, next target",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-53",
+      "text": "Troyan horses, not food",
+      "align": "left"
+    },
+    {
+      "user": "VEX-91",
+      "text": "Pwned the Gibson",
+      "align": "right"
+    },
+    {
+      "user": "PHANTOM-53",
+      "text": "Shodan's watching",
+      "align": "left"
+    }
+  ]
+}
