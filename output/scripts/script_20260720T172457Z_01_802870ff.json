@@ -1,0 +1,40 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "VEX-92",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-77",
+      "text": "Payload delivered, fools",
+      "align": "right"
+    },
+    {
+      "user": "VEX-92",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-77",
+      "text": "Exfiltrate now, losers",
+      "align": "right"
+    },
+    {
+      "user": "VEX-92",
+      "text": "Hack the Gibson",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-77",
+      "text": "Like Butch Cassidy",
+      "align": "right"
+    },
+    {
+      "user": "VEX-92",
+      "text": "Ghost in machines",
+      "align": "left"
+    }
+  ]
+}
