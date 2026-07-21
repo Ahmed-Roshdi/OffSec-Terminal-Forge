@@ -1,0 +1,40 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "MANUSCORE-47",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "EXO-R4",
+      "text": "Payload deployed, bypass successful",
+      "align": "right"
+    },
+    {
+      "user": "MANUSCORE-47",
+      "text": "Exfiltrate the loot",
+      "align": "left"
+    },
+    {
+      "user": "EXO-R4",
+      "text": "Tango down, systems dying",
+      "align": "right"
+    },
+    {
+      "user": "MANUSCORE-47",
+      "text": "Bypass the firewall",
+      "align": "left"
+    },
+    {
+      "user": "EXO-R4",
+      "text": "Like a digital ninja",
+      "align": "right"
+    },
+    {
+      "user": "MANUSCORE-47",
+      "text": "Ghost in the machine",
+      "align": "left"
+    }
+  ]
+}
