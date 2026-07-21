@@ -1,0 +1,45 @@
+{
+  "title": "Shadow Net",
+  "script": [
+    {
+      "user": "CORTEX-21",
+      "text": "Zero-day payload incoming",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-70",
+      "text": "Bypass fail",
+      "align": "right"
+    },
+    {
+      "user": "CORTEX-21",
+      "text": "Exfiltrate now",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-70",
+      "text": "Dark side awaits",
+      "align": "right"
+    },
+    {
+      "user": "CORTEX-21",
+      "text": "Coffee fuels hacks",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-70",
+      "text": "Pwn the night",
+      "align": "right"
+    },
+    {
+      "user": "CORTEX-21",
+      "text": "Hackers never sleep",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-70",
+      "text": "Shadows prevail",
+      "align": "right"
+    }
+  ]
+}
