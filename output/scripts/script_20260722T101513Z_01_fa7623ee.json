@@ -1,0 +1,45 @@
+{
+  "title": "Dark Web Deal",
+  "script": [
+    {
+      "user": "CIPHER-59",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-14",
+      "text": "Payload delivered",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-59",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-14",
+      "text": "Exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-59",
+      "text": "Like a ninja",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-14",
+      "text": "Ghost in machine",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-59",
+      "text": "Hack the planet",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-14",
+      "text": "Matrix style",
+      "align": "right"
+    }
+  ]
+}
