@@ -1,0 +1,40 @@
+{
+  "title": "Dark Net Duel",
+  "script": [
+    {
+      "user": "CIPHER-8",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "MANUSCORE-68",
+      "text": "Payload incoming, exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-8",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "MANUSCORE-68",
+      "text": "Tango down, payload delivered",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-8",
+      "text": "Ghosting the system",
+      "align": "left"
+    },
+    {
+      "user": "MANUSCORE-68",
+      "text": "Kafkaesque nightmare",
+      "align": "right"
+    },
+    {
+      "user": "CIPHER-8",
+      "text": "Crashing the party",
+      "align": "left"
+    }
+  ]
+}
