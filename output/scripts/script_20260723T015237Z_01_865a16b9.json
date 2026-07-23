@@ -1,0 +1,40 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "EXO-R4",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "HEX-T-01",
+      "text": "Payload deployed, bypass imminent",
+      "align": "right"
+    },
+    {
+      "user": "EXO-R4",
+      "text": "Exfiltrate now, we're burning",
+      "align": "left"
+    },
+    {
+      "user": "HEX-T-01",
+      "text": "Shut up, I'm hacking",
+      "align": "right"
+    },
+    {
+      "user": "EXO-R4",
+      "text": "Like a Kardashian",
+      "align": "left"
+    },
+    {
+      "user": "HEX-T-01",
+      "text": "Darknet, here we come",
+      "align": "right"
+    },
+    {
+      "user": "EXO-R4",
+      "text": "With bad RAM, no less",
+      "align": "left"
+    }
+  ]
+}
