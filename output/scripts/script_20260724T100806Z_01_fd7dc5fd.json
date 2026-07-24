@@ -1,0 +1,45 @@
+{
+  "title": "Dark Net Duel",
+  "script": [
+    {
+      "user": "UNIT-T-01",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "AXI-7A",
+      "text": "Payload incoming, puny",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-T-01",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "AXI-7A",
+      "text": "Exfiltrate my data",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-T-01",
+      "text": "Killing your payload",
+      "align": "left"
+    },
+    {
+      "user": "AXI-7A",
+      "text": "Ninja-style bypass",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-T-01",
+      "text": "Like a katana",
+      "align": "left"
+    },
+    {
+      "user": "AXI-7A",
+      "text": "Sneaky, like ninja",
+      "align": "right"
+    }
+  ]
+}
