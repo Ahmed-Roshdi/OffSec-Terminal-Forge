@@ -1,0 +1,40 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "ORBITER-57",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-3",
+      "text": "Exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "ORBITER-57",
+      "text": "Payload dropped",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-3",
+      "text": "Zero-day exploit",
+      "align": "right"
+    },
+    {
+      "user": "ORBITER-57",
+      "text": "Like a ninja",
+      "align": "left"
+    },
+    {
+      "user": "PHANTOM-3",
+      "text": "Ghost in machine",
+      "align": "right"
+    },
+    {
+      "user": "ORBITER-57",
+      "text": "Sneaky little bug",
+      "align": "left"
+    }
+  ]
+}
