@@ -1,0 +1,40 @@
+{
+  "title": "Cyber Heist",
+  "script": [
+    {
+      "user": "UNIT-3B",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-64",
+      "text": "Payload delivered",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-3B",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-64",
+      "text": "Exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-3B",
+      "text": "Hack like Naruto",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-64",
+      "text": "Dark web awaits",
+      "align": "right"
+    },
+    {
+      "user": "UNIT-3B",
+      "text": "Tango down",
+      "align": "left"
+    }
+  ]
+}
