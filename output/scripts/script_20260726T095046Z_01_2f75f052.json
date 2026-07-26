@@ -1,0 +1,45 @@
+{
+  "title": "Dark Net",
+  "script": [
+    {
+      "user": "NODE-7A",
+      "text": "Zero-day exploit loaded",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-92",
+      "text": "Payload incoming, boss",
+      "align": "right"
+    },
+    {
+      "user": "NODE-7A",
+      "text": "Bypassing firewalls",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-92",
+      "text": "Exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "NODE-7A",
+      "text": "Like Butch Cassidy",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-92",
+      "text": "Without the charm",
+      "align": "right"
+    },
+    {
+      "user": "NODE-7A",
+      "text": "Ghosting the system",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-92",
+      "text": "No honor among hackers",
+      "align": "right"
+    }
+  ]
+}
