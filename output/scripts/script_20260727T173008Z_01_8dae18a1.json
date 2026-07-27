@@ -1,0 +1,40 @@
+{
+  "title": "Neon Shadows",
+  "script": [
+    {
+      "user": "SYN-3B",
+      "text": "Zero-day exploits are my love",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-3",
+      "text": "Payload delivery is my game",
+      "align": "right"
+    },
+    {
+      "user": "SYN-3B",
+      "text": "Bypass security with ease",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-3",
+      "text": "Exfiltrate data, no remorse",
+      "align": "right"
+    },
+    {
+      "user": "SYN-3B",
+      "text": "Like a digital ninja",
+      "align": "left"
+    },
+    {
+      "user": "CIPHER-3",
+      "text": "Silent, deadly, and cold",
+      "align": "right"
+    },
+    {
+      "user": "SYN-3B",
+      "text": "Hackers are the new rockstars",
+      "align": "left"
+    }
+  ]
+}
