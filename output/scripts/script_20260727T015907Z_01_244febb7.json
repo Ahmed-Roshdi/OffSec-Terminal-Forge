@@ -1,0 +1,40 @@
+{
+  "title": "Zero Day",
+  "script": [
+    {
+      "user": "MANUSCORE-82",
+      "text": "Zero-day payload incoming",
+      "align": "left"
+    },
+    {
+      "user": "SYN-3B",
+      "text": "Bypassing firewalls",
+      "align": "right"
+    },
+    {
+      "user": "MANUSCORE-82",
+      "text": "Exfiltrate now",
+      "align": "left"
+    },
+    {
+      "user": "SYN-3B",
+      "text": "Data is gold",
+      "align": "right"
+    },
+    {
+      "user": "MANUSCORE-82",
+      "text": "Hack the Gibson",
+      "align": "left"
+    },
+    {
+      "user": "SYN-3B",
+      "text": "Like in Neuromancer",
+      "align": "right"
+    },
+    {
+      "user": "MANUSCORE-82",
+      "text": "Dark net awaits",
+      "align": "left"
+    }
+  ]
+}
