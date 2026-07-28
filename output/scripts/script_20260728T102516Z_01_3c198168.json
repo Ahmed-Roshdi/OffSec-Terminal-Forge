@@ -1,0 +1,40 @@
+{
+  "title": "Zero Day",
+  "script": [
+    {
+      "user": "MANUSCORE-54",
+      "text": "Bypass firewall with ease",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-27",
+      "text": "Payload deployed, exfiltrate now",
+      "align": "right"
+    },
+    {
+      "user": "MANUSCORE-54",
+      "text": "Coffee fuels my zero-day",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-27",
+      "text": "Shaken, not stirred, like Bond",
+      "align": "right"
+    },
+    {
+      "user": "MANUSCORE-54",
+      "text": "Exploit kits are my game",
+      "align": "left"
+    },
+    {
+      "user": "ORBITER-27",
+      "text": "Bypass and own the night",
+      "align": "right"
+    },
+    {
+      "user": "MANUSCORE-54",
+      "text": "Ghost in the machine laughs",
+      "align": "left"
+    }
+  ]
+}
